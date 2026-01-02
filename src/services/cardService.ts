@@ -1,6 +1,6 @@
 import { db } from '../db/connection';
 import { cards, userProgress } from '../db/schema';
-import { eq, notInArray, sql, and } from 'drizzle-orm';
+import { eq, notInArray, sql, and, inArray } from 'drizzle-orm';
 import type { Card } from '../db/schema';
 
 export class CardService {
@@ -33,6 +33,11 @@ export class CardService {
   }
 
   async markCardAsAnswered(userId: string, cardId: string): Promise<void> {
+    const hasSeenCard = await this.hasUserSeenCard(userId, cardId);
+    if (hasSeenCard) {
+      return;
+    }
+
     await db.insert(userProgress).values({
       userId,
       cardId,
@@ -50,6 +55,32 @@ export class CardService {
       ));
 
     return (result[0]?.count ?? 0) > 0;
+  }
+
+  async getSeenCardIds(userId: string): Promise<string[]> {
+    const seenCards = await db
+      .select({ cardId: userProgress.cardId })
+      .from(userProgress)
+      .where(eq(userProgress.userId, userId));
+
+    return seenCards.map(row => row.cardId);
+  }
+
+  async getUserProgress(userId: string): Promise<{ totalCards: number; seenCards: number; completedPercentage: number }> {
+    const [totalResult, seenResult] = await Promise.all([
+      db.select({ count: sql<number>`count(*)` }).from(cards),
+      db.select({ count: sql<number>`count(*)` }).from(userProgress).where(eq(userProgress.userId, userId))
+    ]);
+
+    const totalCards = totalResult[0]?.count ?? 0;
+    const seenCards = seenResult[0]?.count ?? 0;
+    const completedPercentage = totalCards > 0 ? Math.round((seenCards / totalCards) * 100) : 0;
+
+    return {
+      totalCards,
+      seenCards,
+      completedPercentage
+    };
   }
 
   private generateSeed(userId: string): number {

@@ -3,6 +3,8 @@ import cors from 'cors';
 import { env } from './config/env';
 import { healthRouter } from './routes/health';
 import { cardsRouter } from './routes/cards';
+import { handoffRouter } from './routes/handoff';
+import { progressRouter } from './routes/progress';
 
 const app = express();
 
@@ -11,6 +13,8 @@ app.use(express.json());
 
 app.use('/health', healthRouter);
 app.use('/api/cards', cardsRouter);
+app.use('/api/handoff', handoffRouter);
+app.use('/api/progress', progressRouter);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });

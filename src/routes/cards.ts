@@ -15,7 +15,15 @@ cardsRouter.get('/next', async (req, res) => {
     const card = await cardService.getNextCard(userId);
     
     if (!card) {
-      return res.status(404).json({ error: 'No more cards available' });
+      const progress = await cardService.getUserProgress(userId);
+      return res.json({ 
+        completed: true,
+        progress: {
+          totalCards: progress.totalCards,
+          seenCards: progress.seenCards,
+          completedPercentage: progress.completedPercentage
+        }
+      });
     }
 
     res.json({ card });
@@ -31,11 +39,6 @@ cardsRouter.post('/answer', async (req, res) => {
     
     if (!userId || !cardId) {
       return res.status(400).json({ error: 'userId and cardId are required' });
-    }
-
-    const hasSeenCard = await cardService.hasUserSeenCard(userId, cardId);
-    if (hasSeenCard) {
-      return res.status(400).json({ error: 'Card already answered by this user' });
     }
 
     await cardService.markCardAsAnswered(userId, cardId);
