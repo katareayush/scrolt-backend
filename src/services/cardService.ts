@@ -1,6 +1,6 @@
 import { db } from '../db/connection';
 import { cards, userProgress } from '../db/schema';
-import { eq, notInArray, sql } from 'drizzle-orm';
+import { eq, notInArray, sql, and } from 'drizzle-orm';
 import type { Card } from '../db/schema';
 
 export class CardService {
@@ -44,8 +44,10 @@ export class CardService {
     const result = await db
       .select({ count: sql<number>`count(*)` })
       .from(userProgress)
-      .where(eq(userProgress.userId, userId))
-      .where(eq(userProgress.cardId, cardId));
+      .where(and(
+        eq(userProgress.userId, userId),
+        eq(userProgress.cardId, cardId)
+      ));
 
     return (result[0]?.count ?? 0) > 0;
   }

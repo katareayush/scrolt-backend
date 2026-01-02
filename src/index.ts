@@ -22,21 +22,21 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 });
 
 const server = app.listen(env.PORT, () => {
-  console.log(`🚀 Server running on port ${env.PORT}`);
+  console.log(`Server running on port ${env.PORT}`);
 });
 
 process.on('SIGINT', () => {
-  console.log('\n🔄 Shutting down server...');
+  console.log('\nShutting down server...');
   server.close(() => {
-    console.log('✅ Server closed');
+    console.log('Server closed');
     process.exit(0);
   });
 });
 
 process.on('SIGTERM', () => {
-  console.log('\n🔄 Shutting down server...');
+  console.log('\nShutting down server...');
   server.close(() => {
-    console.log('✅ Server closed');
+    console.log('Server closed');
     process.exit(0);
   });
 });

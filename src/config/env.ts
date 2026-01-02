@@ -13,9 +13,9 @@ const parseEnv = () => {
   const result = envSchema.safeParse(process.env);
   
   if (!result.success) {
-    console.error('❌ Invalid environment variables:');
-    result.error.errors.forEach(error => {
-      console.error(`${error.path.join('.')}: ${error.message}`);
+    console.error('Invalid environment variables:');
+    result.error.issues.forEach(issue => {
+      console.error(`${issue.path.join('.')}: ${issue.message}`);
     });
     process.exit(1);
   }
