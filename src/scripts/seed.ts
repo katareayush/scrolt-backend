@@ -1,7 +1,7 @@
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { db } from '../db/connection';
-import { cards } from '../db/schema';
+import { cards, userProgress } from '../db/schema';
 import type { NewCard } from '../db/schema';
 
 interface CardData {
@@ -23,6 +23,9 @@ const main = async () => {
 
     console.log(`Found ${cardsData.length} cards to seed`);
 
+    await db.delete(userProgress);
+    console.log('Cleared existing user progress');
+    
     await db.delete(cards);
     console.log('Cleared existing cards');
 
