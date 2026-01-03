@@ -33,6 +33,44 @@ cardsRouter.get('/next', async (req, res) => {
   }
 });
 
+cardsRouter.get('/batch', async (req, res) => {
+  try {
+    const userId = req.query.userId as string;
+    const count = parseInt(req.query.count as string) || 10;
+    const cursor = req.query.cursor as string;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const result = await cardService.getBatch(userId, count, cursor);
+    
+    if (result.cards.length === 0) {
+      const progress = await cardService.getUserProgress(userId);
+      return res.json({ 
+        completed: true,
+        cards: [],
+        hasMore: false,
+        progress: {
+          totalCards: progress.totalCards,
+          seenCards: progress.seenCards,
+          completedPercentage: progress.completedPercentage
+        }
+      });
+    }
+
+    res.json({ 
+      cards: result.cards, 
+      nextCursor: result.nextCursor,
+      hasMore: result.hasMore,
+      completed: !result.hasMore
+    });
+  } catch (error) {
+    console.error('Error fetching batch cards:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 cardsRouter.post('/answer', async (req, res) => {
   try {
     const { userId, cardId } = req.body;

@@ -4,32 +4,49 @@ import { eq, notInArray, sql, and, inArray } from 'drizzle-orm';
 import type { Card } from '../db/schema';
 
 export class CardService {
-  async getNextCard(userId: string): Promise<Card | null> {
+  async getBatch(userId: string, count: number = 10, cursor?: string): Promise<{ cards: Card[]; nextCursor: string | undefined; hasMore: boolean }> {
     const seenCardIds = await db
       .select({ cardId: userProgress.cardId })
       .from(userProgress)
       .where(eq(userProgress.userId, userId));
 
     const seenCardIdValues = seenCardIds.map(row => row.cardId);
-
-    let availableCards;
-    if (seenCardIdValues.length === 0) {
-      availableCards = await db.select().from(cards);
-    } else {
-      availableCards = await db
-        .select()
-        .from(cards)
-        .where(notInArray(cards.id, seenCardIdValues));
-    }
-
-    if (availableCards.length === 0) {
-      return null;
-    }
-
-    const seedNumber = this.generateSeed(userId);
-    const randomIndex = this.seededRandom(seedNumber + seenCardIdValues.length) % availableCards.length;
     
-    return availableCards[randomIndex] ?? null;
+    const conditions = [];
+    
+    if (seenCardIdValues.length > 0) {
+      conditions.push(notInArray(cards.id, seenCardIdValues));
+    }
+
+    if (cursor) {
+      conditions.push(sql`${cards.id} > ${cursor}`);
+    }
+
+    const baseQuery = db
+      .select()
+      .from(cards)
+      .orderBy(cards.id)
+      .limit(count + 1);
+
+    const query = conditions.length > 0 
+      ? baseQuery.where(conditions.length === 1 ? conditions[0] : and(...conditions))
+      : baseQuery;
+
+    const results = await query;
+    const hasMore = results.length > count;
+    const cardsToReturn = hasMore ? results.slice(0, count) : results;
+    const nextCursor = hasMore ? cardsToReturn[cardsToReturn.length - 1]?.id : undefined;
+
+    return {
+      cards: cardsToReturn,
+      nextCursor,
+      hasMore
+    };
+  }
+
+  async getNextCard(userId: string): Promise<Card | null> {
+    const batch = await this.getBatch(userId, 1);
+    return batch.cards[0] || null;
   }
 
   async markCardAsAnswered(userId: string, cardId: string): Promise<void> {
