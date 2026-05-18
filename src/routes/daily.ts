@@ -23,6 +23,10 @@ const cardService = new CardService();
 
 dailyRouter.get('/', requireUser, async (_req, res) => {
   try {
+    // Daily set is identical for everyone today and changes only at the
+    // UTC day boundary — safe to cache aggressively, even on shared
+    // proxies. Browsers re-validate when the page is revisited.
+    res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=3600');
     const cards = await cardService.getDailyCards(CardService.todayUtc(), 10);
     res.json({ date: CardService.todayUtc(), cards });
   } catch (err) {
@@ -83,6 +87,9 @@ dailyRouter.post('/complete', writeLimiter, requireUser, async (req, res) => {
 
 dailyRouter.get('/leaderboard', async (_req, res) => {
   try {
+    // Public, mildly stale — leaderboard updates as people finish but
+    // doesn't need to be instant.
+    res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=120');
     const today = CardService.todayUtc();
     // Top 50 perfect scores for today. Anonymous users (anon_*) excluded
     // — they have no display identity to put on a board.

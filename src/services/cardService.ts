@@ -323,6 +323,25 @@ export class CardService {
   }
 
   /**
+   * Cards the user has answered correctly, most recent first. Drives
+   * the /words collection page. Capped per-request to keep the payload
+   * sane on power users.
+   */
+  async getMasteredCards(userId: string, limit = 200): Promise<Card[]> {
+    const cap = Math.max(1, Math.min(limit, 1000));
+    const rows = await db.execute(sql`
+      SELECT c.*
+      FROM user_progress p
+      JOIN cards c ON c.id = p.card_id
+      WHERE p.user_id = ${userId}
+        AND p.correct = TRUE
+      ORDER BY p.answered_at DESC
+      LIMIT ${cap}
+    `);
+    return ((rows as unknown as { rows: Card[] }).rows ?? []);
+  }
+
+  /**
    * Most recently wrong cards, ordered newest-first. Used by /review.
    *
    * Returns full Card objects (not just ids) because the review page

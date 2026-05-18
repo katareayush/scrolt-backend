@@ -30,13 +30,33 @@ cardsRouter.get('/next', requireUser, async (req, res) => {
   }
 });
 
+const ALLOWED_CATEGORIES = new Set([
+  'emotion', 'everyday', 'work', 'opinion', 'social', 'precision',
+]);
+const ALLOWED_DIFFICULTIES = new Set(['easy', 'medium', 'hard']);
+
 cardsRouter.get('/batch', requireUser, async (req, res) => {
   try {
     const userId = req.userId!;
     const count = parseInt(req.query.count as string) || 10;
     const cursor = req.query.cursor as string;
+    const categoryRaw = typeof req.query.category === 'string' ? req.query.category : '';
+    const difficultyRaw = typeof req.query.difficulty === 'string' ? req.query.difficulty : '';
+    const preferredCategory = ALLOWED_CATEGORIES.has(categoryRaw) ? categoryRaw : undefined;
+    const preferredDifficulty = ALLOWED_DIFFICULTIES.has(difficultyRaw) ? difficultyRaw : undefined;
 
-    const result = await cardService.getBatch(userId, count, cursor);
+    // Private cache for 30s so a back-button or quick reload doesn't
+    // re-hit the API. `private` keeps shared proxies / CDNs out — the
+    // payload is user-specific.
+    res.setHeader('Cache-Control', 'private, max-age=30');
+
+    const result = await cardService.getBatch(
+      userId,
+      count,
+      cursor,
+      preferredDifficulty,
+      preferredCategory,
+    );
 
     if (result.cards.length === 0) {
       const progress = await cardService.getUserProgress(userId);
@@ -60,6 +80,24 @@ cardsRouter.get('/batch', requireUser, async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching batch cards:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * Cards the user answered correctly. Drives the /words page.
+ *
+ * Returns the answered word + category + sentence for each — enough
+ * to render the collection without a second fetch.
+ */
+cardsRouter.get('/mastered', requireUser, async (req, res) => {
+  try {
+    const userId = req.userId!;
+    res.setHeader('Cache-Control', 'private, max-age=30');
+    const cards = await cardService.getMasteredCards(userId, 500);
+    res.json({ cards });
+  } catch (error) {
+    console.error('Error fetching mastered cards:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
