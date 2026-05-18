@@ -8,6 +8,34 @@
       "when": 1767363091033,
       "tag": "0000_messy_proteus",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1747234560000,
+      "tag": "0001_add_auth",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1747234600000,
+      "tag": "0002_user_progress_pk",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1747234640000,
+      "tag": "0003_track_correct",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1747234680000,
+      "tag": "0004_daily_results",
+      "breakpoints": true
     }
   ]
 }
