@@ -10,6 +10,7 @@ import {
   type CardMeta,
   type Weights,
 } from './cardAlgorithm';
+import { LocalCache } from '../utils/localCache';
 
 export { rankCards, pickDailyIds, fnv1aNormalized };
 export type { CardMeta, Weights };
@@ -51,15 +52,51 @@ export class CardService {
   private static readonly STREAK_TTL = 5 * 60;
   private static readonly METADATA_TTL = 60 * 60;
   private static readonly METADATA_KEY = 'catalog:metadata:v1';
+  private static readonly localMetadataCache = new LocalCache<CardMeta[]>(5 * 60 * 1000);
+  private static readonly localUserVersionCache = new LocalCache<string>(30 * 60 * 1000);
+  private static readonly localBatchCache = new LocalCache<{
+    cards: Card[];
+    nextCursor: string | undefined;
+    hasMore: boolean;
+  }>(60 * 1000);
+  private static readonly localSeenCardsCache = new LocalCache<string[]>(5 * 60 * 1000);
+  private static readonly localReviewDueCache = new LocalCache<string[]>(2 * 60 * 1000);
+  private static readonly localProgressCache = new LocalCache<{
+    totalCards: number;
+    seenCards: number;
+    completedPercentage: number;
+  }>(30 * 1000);
+  private static readonly localStreakCache = new LocalCache<{
+    streak: number;
+    todayCount: number;
+    totalAnswered: number;
+    lastAnsweredAt: string | null;
+  }>(30 * 1000);
 
   private getCacheKey(prefix: string, ...keys: string[]): string {
     return `${prefix}:${keys.join(':')}`;
   }
 
+  private fromRedisJson<T>(value: unknown): T | null {
+    if (value == null) return null;
+    if (typeof value === 'string') {
+      return JSON.parse(value) as T;
+    }
+    return value as T;
+  }
+
   private async getCardMetadata(): Promise<CardMeta[]> {
+    const local = CardService.localMetadataCache.get(CardService.METADATA_KEY);
+    if (local) return local;
+
     try {
       const cached = await redis.get(CardService.METADATA_KEY);
-      if (cached) return JSON.parse(cached as string) as CardMeta[];
+      if (cached) {
+        const parsed = this.fromRedisJson<CardMeta[]>(cached);
+        if (!parsed) return [];
+        CardService.localMetadataCache.set(CardService.METADATA_KEY, parsed);
+        return parsed;
+      }
     } catch (err) {
       console.warn('Metadata cache read error:', err);
     }
@@ -84,6 +121,7 @@ export class CardService {
     } catch (err) {
       console.warn('Metadata cache write error:', err);
     }
+    CardService.localMetadataCache.set(CardService.METADATA_KEY, meta);
     return meta;
   }
 
@@ -94,12 +132,20 @@ export class CardService {
     } catch (err) {
       console.warn('Catalog invalidation error:', err);
     }
+    CardService.localMetadataCache.delete(CardService.METADATA_KEY);
   }
 
   private async getUserCacheVersion(userId: string): Promise<string> {
+    const local = CardService.localUserVersionCache.get(userId);
+    if (local) return local;
+
     try {
       const v = await redis.get(this.getCacheKey('user', userId, 'v'));
-      if (v != null) return String(v);
+      if (v != null) {
+        const version = String(v);
+        CardService.localUserVersionCache.set(userId, version);
+        return version;
+      }
     } catch (err) {
       console.warn('User cache version read error:', err);
     }
@@ -126,9 +172,23 @@ export class CardService {
       preferredCategory ?? '_',
     );
 
+    const localBatch = CardService.localBatchCache.get(batchKey);
+    if (localBatch) return localBatch;
+
     try {
       const cached = await redis.get(batchKey);
-      if (cached) return JSON.parse(cached as string);
+      if (cached) {
+        const parsed = this.fromRedisJson<{
+          cards: Card[];
+          nextCursor: string | undefined;
+          hasMore: boolean;
+        }>(cached);
+        if (!parsed) {
+          return { cards: [], nextCursor: undefined, hasMore: false };
+        }
+        CardService.localBatchCache.set(batchKey, parsed);
+        return parsed;
+      }
     } catch (err) {
       console.warn('Batch cache read error:', err);
     }
@@ -160,6 +220,7 @@ export class CardService {
       } catch {
         /* swallow */
       }
+      CardService.localBatchCache.set(batchKey, empty);
       return empty;
     }
 
@@ -185,6 +246,7 @@ export class CardService {
     } catch (err) {
       console.warn('Batch cache write error:', err);
     }
+    CardService.localBatchCache.set(batchKey, result);
     return result;
   }
 
@@ -208,7 +270,7 @@ export class CardService {
     const cacheKey = `daily:cards:${dateStr}:${count}`;
     try {
       const cached = await redis.get(cacheKey);
-      if (cached) return JSON.parse(cached as string) as Card[];
+      if (cached) return this.fromRedisJson<Card[]>(cached) ?? [];
     } catch (err) {
       console.warn('Daily cache read error:', err);
     }
@@ -284,9 +346,17 @@ export class CardService {
    */
   async getSeenCardIds(userId: string): Promise<string[]> {
     const cacheKey = this.getCacheKey('seen_cards', userId);
+    const local = CardService.localSeenCardsCache.get(cacheKey);
+    if (local) return local;
+
     try {
       const cached = await redis.get(cacheKey);
-      if (cached) return JSON.parse(cached as string) as string[];
+      if (cached) {
+        const parsed = this.fromRedisJson<string[]>(cached);
+        if (!parsed) return [];
+        CardService.localSeenCardsCache.set(cacheKey, parsed);
+        return parsed;
+      }
     } catch (err) {
       console.warn('Seen-cards cache read error:', err);
     }
@@ -319,6 +389,7 @@ export class CardService {
     } catch (err) {
       console.warn('Seen-cards cache write error:', err);
     }
+    CardService.localSeenCardsCache.set(cacheKey, result);
     return result;
   }
 
@@ -369,9 +440,17 @@ export class CardService {
    */
   async getCardsDueForReview(userId: string): Promise<Set<string>> {
     const cacheKey = this.getCacheKey('review_due', userId);
+    const local = CardService.localReviewDueCache.get(cacheKey);
+    if (local) return new Set(local);
+
     try {
       const cached = await redis.get(cacheKey);
-      if (cached) return new Set(JSON.parse(cached as string) as string[]);
+      if (cached) {
+        const parsed = this.fromRedisJson<string[]>(cached);
+        if (!parsed) return new Set();
+        CardService.localReviewDueCache.set(cacheKey, parsed);
+        return new Set(parsed);
+      }
     } catch (err) {
       console.warn('Review-due cache read error:', err);
     }
@@ -399,6 +478,7 @@ export class CardService {
     } catch (err) {
       console.warn('Review-due cache write error:', err);
     }
+    CardService.localReviewDueCache.set(cacheKey, Array.from(dueSet));
     return dueSet;
   }
 
@@ -406,9 +486,23 @@ export class CardService {
     userId: string,
   ): Promise<{ totalCards: number; seenCards: number; completedPercentage: number }> {
     const cacheKey = this.getCacheKey('progress', userId);
+    const local = CardService.localProgressCache.get(cacheKey);
+    if (local) return local;
+
     try {
       const cached = await redis.get(cacheKey);
-      if (cached) return JSON.parse(cached as string);
+      if (cached) {
+        const parsed = this.fromRedisJson<{
+          totalCards: number;
+          seenCards: number;
+          completedPercentage: number;
+        }>(cached);
+        if (!parsed) {
+          return { totalCards: 0, seenCards: 0, completedPercentage: 0 };
+        }
+        CardService.localProgressCache.set(cacheKey, parsed);
+        return parsed;
+      }
     } catch (err) {
       console.warn('Progress cache read error:', err);
     }
@@ -434,6 +528,7 @@ export class CardService {
     } catch (err) {
       console.warn('Progress cache write error:', err);
     }
+    CardService.localProgressCache.set(cacheKey, result);
     return result;
   }
 
@@ -444,9 +539,24 @@ export class CardService {
     lastAnsweredAt: string | null;
   }> {
     const cacheKey = this.getCacheKey('streak', userId);
+    const local = CardService.localStreakCache.get(cacheKey);
+    if (local) return local;
+
     try {
       const cached = await redis.get(cacheKey);
-      if (cached) return JSON.parse(cached as string);
+      if (cached) {
+        const parsed = this.fromRedisJson<{
+          streak: number;
+          todayCount: number;
+          totalAnswered: number;
+          lastAnsweredAt: string | null;
+        }>(cached);
+        if (!parsed) {
+          return { streak: 0, todayCount: 0, totalAnswered: 0, lastAnsweredAt: null };
+        }
+        CardService.localStreakCache.set(cacheKey, parsed);
+        return parsed;
+      }
     } catch (err) {
       console.warn('Streak cache read error:', err);
     }
@@ -512,6 +622,7 @@ export class CardService {
     } catch (err) {
       console.warn('Streak cache write error:', err);
     }
+    CardService.localStreakCache.set(cacheKey, result);
     return result;
   }
 
@@ -549,6 +660,11 @@ export class CardService {
     return w;
   }
 
+  /** Warm the shared catalog metadata cache on process boot. */
+  async warmCatalogCache(): Promise<void> {
+    await this.getCardMetadata();
+  }
+
   /**
    * Invalidate per-user caches. Bumps the user's cache version so all
    * existing batch keys become orphaned (no expensive scan/delete).
@@ -557,7 +673,7 @@ export class CardService {
   async invalidateUser(userId: string): Promise<void> {
     try {
       const versionKey = this.getCacheKey('user', userId, 'v');
-      await Promise.all([
+      const [nextVersion] = await Promise.all([
         redis.incr(versionKey),
         redis.del(this.getCacheKey('seen_cards', userId)),
         redis.del(this.getCacheKey('progress', userId)),
@@ -567,9 +683,14 @@ export class CardService {
       // Keep the version key around for a long time so consumers see a
       // stable version across short-lived restarts.
       await redis.expire(versionKey, 60 * 60 * 24 * 30);
+      CardService.localUserVersionCache.set(userId, String(nextVersion));
+      CardService.localBatchCache.deleteByPrefix(`batch:${userId}:`);
+      CardService.localSeenCardsCache.delete(this.getCacheKey('seen_cards', userId));
+      CardService.localProgressCache.delete(this.getCacheKey('progress', userId));
+      CardService.localStreakCache.delete(this.getCacheKey('streak', userId));
+      CardService.localReviewDueCache.delete(this.getCacheKey('review_due', userId));
     } catch (err) {
       console.warn('Cache invalidation error:', err);
     }
   }
 }
-

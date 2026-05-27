@@ -1,4 +1,4 @@
-import rateLimit, { type Options } from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator, type Options } from 'express-rate-limit';
 import type { Request } from 'express';
 import { logger } from './logger';
 
@@ -8,7 +8,7 @@ import { logger } from './logger';
  * doesn't get throttled by their roommates' traffic. Falls back to IP.
  */
 function keyByUser(req: Request): string {
-  return req.userId ?? `ip:${req.ip ?? 'unknown'}`;
+  return req.userId ?? `ip:${ipKeyGenerator(req.ip ?? 'unknown')}`;
 }
 
 /**

@@ -13,6 +13,7 @@ import { dailyRouter } from './routes/daily';
 import { friendsRouter } from './routes/friends';
 import { sessionMiddleware } from './middleware/session';
 import { requestLogger, logger } from './middleware/logger';
+import { CardService } from './services/cardService';
 
 const app = express();
 
@@ -101,6 +102,12 @@ app.use((err: unknown, req: express.Request, res: express.Response, _next: expre
 
 const server = app.listen(env.PORT, () => {
   logger.info('listening', { port: env.PORT, env: env.NODE_ENV });
+  const cardService = new CardService();
+  cardService.warmCatalogCache().catch((err) => {
+    logger.warn('catalog_warm_failed', {
+      err: err instanceof Error ? err.message : String(err),
+    });
+  });
 });
 
 /**
