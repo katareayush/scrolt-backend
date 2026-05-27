@@ -72,7 +72,27 @@ export const users = pgTable('users', {
   emailVerified: timestamp('emailVerified', { mode: 'date' }),
   image: text('image'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
+  /** 6-char base32 code for share-to-add. Generated lazily. */
+  friendCode: varchar('friend_code', { length: 8 }),
 });
+
+/**
+ * Symmetric friendship. We INSERT both (a,b) and (b,a) on accept so
+ * "list a user's friends" is a single indexed lookup with no UNION.
+ */
+export const friends = pgTable(
+  'friends',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    friendUserId: text('friend_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    addedAt: timestamp('added_at').defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.friendUserId] })],
+);
 
 export const accounts = pgTable(
   'accounts',

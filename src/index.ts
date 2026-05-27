@@ -10,6 +10,7 @@ import { handoffRouter } from './routes/handoff';
 import { progressRouter } from './routes/progress';
 import { authRouter } from './routes/auth';
 import { dailyRouter } from './routes/daily';
+import { friendsRouter } from './routes/friends';
 import { sessionMiddleware } from './middleware/session';
 import { requestLogger, logger } from './middleware/logger';
 
@@ -82,6 +83,7 @@ app.use('/health', healthRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/cards', cardsRouter);
 app.use('/api/daily', dailyRouter);
+app.use('/api/friends', friendsRouter);
 app.use('/api/handoff', handoffRouter);
 app.use('/api/progress', progressRouter);
 
