@@ -110,6 +110,7 @@ cardsRouter.get('/mastered', requireUser, async (req, res) => {
 cardsRouter.get('/wrong', requireUser, async (req, res) => {
   try {
     const userId = req.userId!;
+    res.setHeader('Cache-Control', 'private, max-age=30');
     const cards = await cardService.getWrongCards(userId, 50);
     res.json({ cards });
   } catch (error) {

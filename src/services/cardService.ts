@@ -561,16 +561,31 @@ export class CardService {
       console.warn('Streak cache read error:', err);
     }
 
-    const dayRows = await db.execute(sql`
-      SELECT DISTINCT DATE(answered_at AT TIME ZONE 'UTC') AS day
+    // One round trip: distinct active days (for the streak walk) and the
+    // lifetime aggregates come back in a single row. `string_agg` keeps
+    // the day list as plain text so no array-type parsing is involved.
+    const todayUtcStr = new Date().toISOString().slice(0, 10);
+    const combinedRows = await db.execute(sql`
+      WITH days AS (
+        SELECT DISTINCT DATE(answered_at AT TIME ZONE 'UTC') AS day
+        FROM user_progress
+        WHERE user_id = ${userId}
+        ORDER BY day DESC
+        LIMIT 365
+      )
+      SELECT
+        (SELECT string_agg(day::text, ',' ORDER BY day DESC) FROM days) AS days,
+        COUNT(*)::text AS total,
+        COUNT(*) FILTER (WHERE DATE(answered_at AT TIME ZONE 'UTC') = ${todayUtcStr})::text AS today_count,
+        MAX(answered_at)::text AS last_at
       FROM user_progress
       WHERE user_id = ${userId}
-      ORDER BY day DESC
-      LIMIT 365
     `);
-    const days: string[] = ((dayRows as unknown as { rows: { day: string }[] }).rows ?? []).map(
-      (r) => r.day,
-    );
+    const combined =
+      ((combinedRows as unknown as {
+        rows: { days: string | null; total: string; today_count: string; last_at: string | null }[];
+      }).rows ?? [])[0] ?? { days: null, total: '0', today_count: '0', last_at: null };
+    const days: string[] = combined.days ? combined.days.split(',') : [];
 
     let streak = 0;
     if (days.length > 0) {
@@ -594,25 +609,11 @@ export class CardService {
       }
     }
 
-    const todayUtc = new Date().toISOString().slice(0, 10);
-    const aggRows = await db.execute(sql`
-      SELECT
-        COUNT(*)::text AS total,
-        COUNT(*) FILTER (WHERE DATE(answered_at AT TIME ZONE 'UTC') = ${todayUtc})::text AS today_count,
-        MAX(answered_at)::text AS last_at
-      FROM user_progress
-      WHERE user_id = ${userId}
-    `);
-    const agg =
-      ((aggRows as unknown as {
-        rows: { total: string; today_count: string; last_at: string | null }[];
-      }).rows ?? [])[0] ?? { total: '0', today_count: '0', last_at: null };
-
     const result = {
       streak,
-      todayCount: Number(agg.today_count) || 0,
-      totalAnswered: Number(agg.total) || 0,
-      lastAnsweredAt: agg.last_at,
+      todayCount: Number(combined.today_count) || 0,
+      totalAnswered: Number(combined.total) || 0,
+      lastAnsweredAt: combined.last_at,
     };
 
     try {

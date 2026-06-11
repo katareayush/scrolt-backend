@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { eq, and, sql, inArray } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { db } from '../db/connection';
 import { users, friends, dailyResults } from '../db/schema';
 import { requireAuth } from '../middleware/session';
@@ -130,47 +130,40 @@ friendsRouter.delete('/:friendUserId', sensitiveLimiter, requireAuth, async (req
 
 /**
  * List the caller's friends and each one's daily status for today.
- * Single SQL with three CTE-style scans to avoid N+1.
+ * Single query — today's daily result joins in via LEFT JOIN so a
+ * friend with no run today simply carries null columns.
  */
 friendsRouter.get('/', requireAuth, async (req, res) => {
   try {
     const myId = req.userId!;
     res.setHeader('Cache-Control', 'private, max-age=15');
 
-    const friendRows = await db
+    const today = CardService.todayUtc();
+    const rows = await db
       .select({
         id: users.id,
         name: users.name,
         image: users.image,
-      })
-      .from(friends)
-      .innerJoin(users, eq(users.id, friends.friendUserId))
-      .where(eq(friends.userId, myId));
-
-    if (friendRows.length === 0) {
-      return res.json({ friends: [] });
-    }
-
-    const today = CardService.todayUtc();
-    const dailyRows = await db
-      .select({
-        userId: dailyResults.userId,
         correct: dailyResults.correct,
         total: dailyResults.total,
       })
-      .from(dailyResults)
-      .where(
+      .from(friends)
+      .innerJoin(users, eq(users.id, friends.friendUserId))
+      .leftJoin(
+        dailyResults,
         and(
+          eq(dailyResults.userId, friends.friendUserId),
           eq(dailyResults.date, today),
-          inArray(dailyResults.userId, friendRows.map((f) => f.id)),
         ),
-      );
-    const byUser = new Map(dailyRows.map((d) => [d.userId, d] as const));
+      )
+      .where(eq(friends.userId, myId));
 
     res.json({
-      friends: friendRows.map((f) => ({
-        ...f,
-        daily: byUser.get(f.id) ?? null,
+      friends: rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        image: r.image,
+        daily: r.correct === null || r.total === null ? null : { correct: r.correct, total: r.total },
       })),
     });
   } catch (err) {

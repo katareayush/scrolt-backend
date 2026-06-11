@@ -38,6 +38,9 @@ dailyRouter.get('/', requireUser, async (_req, res) => {
 dailyRouter.get('/status', requireUser, async (req, res) => {
   try {
     const userId = req.userId!;
+    // Completion state flips at most once per day; the daily page keeps
+    // its own local state after completing, so brief staleness is fine.
+    res.setHeader('Cache-Control', 'private, max-age=30');
     const today = CardService.todayUtc();
     const rows = await db
       .select()
