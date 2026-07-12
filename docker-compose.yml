@@ -1,0 +1,71 @@
+# Fully-local backend stack: Postgres + Redis (behind an Upstash-
+# compatible REST proxy, since the app talks to Redis via @upstash/redis
+# over HTTP) + the API.
+#
+#   docker compose up --build            # start everything
+#   docker compose run --rm backend node dist/scripts/migrate.js   # migrate
+#   docker compose run --rm backend node dist/scripts/seed.js      # seed
+#
+# Override AUTH_SECRET via a .env file next to this compose. It MUST be
+# the same value the frontend uses.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: scrolt
+      POSTGRES_PASSWORD: scrolt
+      POSTGRES_DB: scrolt
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scrolt -d scrolt"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Speaks the Upstash REST protocol the @upstash/redis client expects,
+  # backed by the real Redis above.
+  redis-http:
+    image: hiett/serverless-redis-http:latest
+    environment:
+      SRH_MODE: env
+      SRH_TOKEN: local-dev-token
+      SRH_CONNECTION_STRING: redis://redis:6379
+    ports:
+      - "8079:80"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  backend:
+    build: .
+    environment:
+      NODE_ENV: development
+      PORT: "4000"
+      DATABASE_URL: postgresql://scrolt:scrolt@postgres:5432/scrolt
+      UPSTASH_REDIS_REST_URL: http://redis-http:80
+      UPSTASH_REDIS_REST_TOKEN: local-dev-token
+      CORS_ORIGINS: http://localhost:3000
+      AUTH_SECRET: ${AUTH_SECRET:-local-dev-secret-change-me-at-least-32ch}
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis-http:
+        condition: service_started
+
+volumes:
+  pgdata:
