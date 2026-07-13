@@ -1,0 +1,37 @@
+# Optional overlay: adds a throwaway local Postgres and points the backend
+# at it (overriding DATABASE_URL from your .env). Use ON TOP of the base
+# file — it is not standalone:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.db.yml up --build
+#   docker compose -f docker-compose.yml -f docker-compose.db.yml run --rm backend node dist/scripts/migrate.js
+#   docker compose -f docker-compose.yml -f docker-compose.db.yml run --rm -v "$PWD/data:/app/data" backend node dist/scripts/seed.js
+#
+# With this overlay you don't need a real DATABASE_URL in .env (it's
+# overridden below), but .env must still exist for AUTH_SECRET.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: scrolt
+      POSTGRES_PASSWORD: scrolt
+      POSTGRES_DB: scrolt
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scrolt -d scrolt"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    environment:
+      DATABASE_URL: postgresql://scrolt:scrolt@postgres:5432/scrolt
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:

@@ -5,20 +5,35 @@ card feed, progress, daily, friends and auth handoff.
 
 ## Local development (Docker)
 
-`docker compose up` brings up a fully local stack — Postgres, Redis (behind
-an Upstash-compatible REST proxy, since the app talks to Redis via
-`@upstash/redis` over HTTP), and the API — with no external services.
+`docker compose up` runs **Redis + the API** locally (no database). Redis
+sits behind an Upstash-compatible REST proxy, since the app talks to Redis
+via `@upstash/redis` over HTTP. Postgres stays external — point
+`DATABASE_URL` at your hosted DB (Neon).
 
 ```bash
-# 1. Build and start everything (API on http://localhost:4000)
+# 0. Set DATABASE_URL (your hosted Postgres) and AUTH_SECRET
+cp .env.example .env
+
+# 1. Build and start Redis + the API (http://localhost:4000)
 docker compose up --build
 
-# 2. Run migrations (first boot, and after any schema change)
+# 2. Run migrations against DATABASE_URL (first boot, and after schema changes)
 docker compose run --rm backend node dist/scripts/migrate.js
 
 # 3. Seed the card catalog. Reads data/cards.json, which is gitignored
 #    and not baked into the image — mount it in for the one-off run:
 docker compose run --rm -v "$PWD/data:/app/data" backend node dist/scripts/seed.js
+```
+
+### Want a local Postgres too?
+
+Layer the optional overlay on top of the base file — it adds a throwaway
+Postgres container and repoints the backend at it (no real `DATABASE_URL`
+needed, though `.env` must still exist for `AUTH_SECRET`):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.db.yml up --build
+docker compose -f docker-compose.yml -f docker-compose.db.yml run --rm backend node dist/scripts/migrate.js
 ```
 
 Health checks:
@@ -28,20 +43,22 @@ Health checks:
 
 ### Environment
 
-The compose file wires local defaults. The only value you should override is
-`AUTH_SECRET`, which **must match the frontend's** — put it in a `.env` next
-to `docker-compose.yml`:
+Copy `.env.example` to `.env`. The compose file overrides the Redis + CORS
+values to the local proxy, so the two you actually set are `DATABASE_URL`
+(your hosted Postgres) and `AUTH_SECRET` (which **must match the
+frontend's**):
 
 ```bash
+DATABASE_URL=<your hosted Postgres URL>
 AUTH_SECRET=<32+ char secret, same as frontend>
 ```
 
-| Var | Local default | Notes |
+| Var | Docker (base) | Notes |
 | --- | --- | --- |
-| `DATABASE_URL` | local Postgres container | Neon pooler URL in prod |
-| `UPSTASH_REDIS_REST_URL` / `_TOKEN` | local REST proxy | Upstash in prod |
-| `CORS_ORIGINS` | `http://localhost:3000` | comma-separated in prod |
-| `AUTH_SECRET` | placeholder — override it | shared with frontend |
+| `DATABASE_URL` | from your `.env` | external/hosted (Neon); local via `docker-compose.db.yml` |
+| `UPSTASH_REDIS_REST_URL` / `_TOKEN` | local REST proxy | overridden by compose; Upstash in prod |
+| `CORS_ORIGINS` | `http://localhost:3000` | overridden by compose; comma-separated in prod |
+| `AUTH_SECRET` | from your `.env` | shared with frontend |
 
 ## Production
 
