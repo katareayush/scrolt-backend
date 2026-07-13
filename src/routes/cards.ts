@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { CardService } from '../services/cardService';
 import { requireUser } from '../middleware/session';
 import { writeLimiter } from '../middleware/rateLimit';
+import { withDbRetry } from '../db/connection';
 
 export const cardsRouter = Router();
 const cardService = new CardService();
@@ -9,10 +10,10 @@ const cardService = new CardService();
 cardsRouter.get('/next', requireUser, async (req, res) => {
   try {
     const userId = req.userId!;
-    const card = await cardService.getNextCard(userId);
+    const card = await withDbRetry(() => cardService.getNextCard(userId));
 
     if (!card) {
-      const progress = await cardService.getUserProgress(userId);
+      const progress = await withDbRetry(() => cardService.getUserProgress(userId));
       return res.json({
         completed: true,
         progress: {
@@ -50,16 +51,18 @@ cardsRouter.get('/batch', requireUser, async (req, res) => {
     // payload is user-specific.
     res.setHeader('Cache-Control', 'private, max-age=30');
 
-    const result = await cardService.getBatch(
-      userId,
-      count,
-      cursor,
-      preferredDifficulty,
-      preferredCategory,
+    const result = await withDbRetry(() =>
+      cardService.getBatch(
+        userId,
+        count,
+        cursor,
+        preferredDifficulty,
+        preferredCategory,
+      ),
     );
 
     if (result.cards.length === 0) {
-      const progress = await cardService.getUserProgress(userId);
+      const progress = await withDbRetry(() => cardService.getUserProgress(userId));
       return res.json({
         completed: true,
         cards: [],
@@ -94,7 +97,7 @@ cardsRouter.get('/mastered', requireUser, async (req, res) => {
   try {
     const userId = req.userId!;
     res.setHeader('Cache-Control', 'private, max-age=30');
-    const cards = await cardService.getMasteredCards(userId, 500);
+    const cards = await withDbRetry(() => cardService.getMasteredCards(userId, 500));
     res.json({ cards });
   } catch (error) {
     console.error('Error fetching mastered cards:', error);
@@ -111,7 +114,7 @@ cardsRouter.get('/wrong', requireUser, async (req, res) => {
   try {
     const userId = req.userId!;
     res.setHeader('Cache-Control', 'private, max-age=30');
-    const cards = await cardService.getWrongCards(userId, 50);
+    const cards = await withDbRetry(() => cardService.getWrongCards(userId, 50));
     res.json({ cards });
   } catch (error) {
     console.error('Error fetching wrong cards:', error);
