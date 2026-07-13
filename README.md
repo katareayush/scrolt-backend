@@ -25,17 +25,6 @@ docker compose run --rm backend node dist/scripts/migrate.js
 docker compose run --rm -v "$PWD/data:/app/data" backend node dist/scripts/seed.js
 ```
 
-### Want a local Postgres too?
-
-Layer the optional overlay on top of the base file — it adds a throwaway
-Postgres container and repoints the backend at it (no real `DATABASE_URL`
-needed, though `.env` must still exist for `AUTH_SECRET`):
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.db.yml up --build
-docker compose -f docker-compose.yml -f docker-compose.db.yml run --rm backend node dist/scripts/migrate.js
-```
-
 Health checks:
 
 - `GET /health` — liveness, touches no dependencies.
@@ -55,7 +44,7 @@ AUTH_SECRET=<32+ char secret, same as frontend>
 
 | Var | Docker (base) | Notes |
 | --- | --- | --- |
-| `DATABASE_URL` | from your `.env` | external/hosted (Neon); local via `docker-compose.db.yml` |
+| `DATABASE_URL` | from your `.env` | external/hosted Postgres (e.g. Neon) |
 | `UPSTASH_REDIS_REST_URL` / `_TOKEN` | local REST proxy | overridden by compose; Upstash in prod |
 | `CORS_ORIGINS` | `http://localhost:3000` | overridden by compose; comma-separated in prod |
 | `AUTH_SECRET` | from your `.env` | shared with frontend |

@@ -8,9 +8,6 @@
 # Migrations / seed run against whatever DATABASE_URL points at:
 #   docker compose run --rm backend node dist/scripts/migrate.js
 #   docker compose run --rm -v "$PWD/data:/app/data" backend node dist/scripts/seed.js
-#
-# Want a throwaway local Postgres too? Layer the overlay on top:
-#   docker compose -f docker-compose.yml -f docker-compose.db.yml up --build
 
 services:
   redis:
