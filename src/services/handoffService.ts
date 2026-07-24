@@ -41,15 +41,20 @@ export class HandoffService {
     }
 
     const data = await redis.get(`handoff:${token}`);
-    
-    if (!data) {
+
+    if (data == null) {
       return null;
     }
 
     await redis.del(`handoff:${token}`);
 
+    // @upstash/redis deserializes JSON automatically, so `data` is already
+    // an object here; it's only a string if a raw non-JSON value was
+    // stored. Handle both so a client-config change can't silently break
+    // resolution.
     try {
-      const handoffData = JSON.parse(data as string) as HandoffData;
+      const handoffData =
+        typeof data === 'string' ? (JSON.parse(data) as HandoffData) : (data as HandoffData);
       return handoffData;
     } catch {
       return null;

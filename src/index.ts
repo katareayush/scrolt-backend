@@ -13,6 +13,7 @@ import { dailyRouter } from './routes/daily';
 import { friendsRouter } from './routes/friends';
 import { sessionMiddleware } from './middleware/session';
 import { requestLogger, logger } from './middleware/logger';
+import { readLimiter } from './middleware/rateLimit';
 import { CardService } from './services/cardService';
 
 const app = express();
@@ -59,7 +60,11 @@ app.use(
       // No Origin header → same-origin / server-side call.
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) return callback(null, true);
-      return callback(new Error(`CORS: origin ${origin} not allowed`));
+      // Deny by omitting CORS headers rather than throwing. Throwing here
+      // hits the global error handler and surfaces as a 500; a plain deny
+      // lets the browser block the response (the correct outcome) without
+      // logging every disallowed origin as a server error.
+      return callback(null, false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -81,6 +86,11 @@ app.use(requestLogger);
 app.use(sessionMiddleware);
 
 app.use('/health', healthRouter);
+
+// Rate-limit GET traffic to /api/*. Health probes above are exempt so a
+// load balancer can poll them freely.
+app.use('/api', readLimiter);
+
 app.use('/api/auth', authRouter);
 app.use('/api/cards', cardsRouter);
 app.use('/api/daily', dailyRouter);

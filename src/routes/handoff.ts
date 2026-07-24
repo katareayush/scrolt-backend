@@ -24,7 +24,7 @@ handoffRouter.post('/create', sensitiveLimiter, requireUser, async (req, res) =>
   }
 });
 
-handoffRouter.post('/resolve', async (req, res) => {
+handoffRouter.post('/resolve', sensitiveLimiter, async (req, res) => {
   try {
     const { token } = req.body;
 

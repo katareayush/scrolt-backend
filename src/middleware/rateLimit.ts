@@ -49,6 +49,19 @@ export function createLimiter(opts: Partial<Options> = {}) {
 export const writeLimiter = createLimiter();
 
 /**
+ * Read limiter for GET traffic. Writes are governed by their own
+ * per-route limiters, so this one deliberately skips non-GET methods to
+ * avoid double-counting. The cap is high (300/min per user or IP) — a
+ * human paging through the app never approaches it, but it stops a script
+ * from hammering the expensive reads (mastered join, streak CTE, daily
+ * leaderboard) hard enough to run up the Neon bill or degrade the box.
+ */
+export const readLimiter = createLimiter({
+  max: 300,
+  skip: (req) => req.method === 'OPTIONS' || req.method !== 'GET',
+});
+
+/**
  * Tighter limiter for auth-adjacent writes (claim-anon, handoff/create).
  * These shouldn't fire more than a handful of times per hour for any
  * given user under legitimate use.
