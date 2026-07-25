@@ -47,21 +47,39 @@ friendsRouter.get('/me', requireAuth, async (req, res) => {
       .where(eq(users.id, userId))
       .limit(1);
 
-    if (existing[0]?.friendCode) {
+    // A valid JWT whose subject has no users row (stale token, deleted
+    // account). Without this the UPDATE below matches zero rows, does not
+    // throw, and we would hand back a code that exists nowhere — anyone
+    // entering it gets "no user with that code" forever.
+    if (!existing[0]) {
+      return res.status(404).json({ error: 'account not found — sign in again' });
+    }
+
+    if (existing[0].friendCode) {
       return res.json({ friendCode: existing[0].friendCode });
     }
 
     for (let attempt = 0; attempt < 5; attempt++) {
       const code = generateCode();
       try {
-        await db.update(users).set({ friendCode: code }).where(eq(users.id, userId));
-        return res.json({ friendCode: code });
+        const updated = await db
+          .update(users)
+          .set({ friendCode: code })
+          .where(eq(users.id, userId))
+          .returning({ friendCode: users.friendCode });
+        if (!updated[0]) {
+          return res.status(404).json({ error: 'account not found — sign in again' });
+        }
+        return res.json({ friendCode: updated[0].friendCode });
       } catch (err) {
-        // Unique-constraint clash on retry. Continue.
-        if (attempt === 4) throw err;
+        // Only a unique-index clash on friend_code is worth retrying.
+        // Anything else (connection blip, bad SQL) must surface rather
+        // than be retried five times and reported as a generic failure.
+        const code23505 = (err as { code?: string })?.code === '23505';
+        if (!code23505 || attempt === 4) throw err;
       }
     }
-    throw new Error('failed to generate friend code');
+    throw new Error('failed to generate a unique friend code');
   } catch (err) {
     console.error('friends.me failed:', err);
     res.status(500).json({ error: 'Internal server error' });

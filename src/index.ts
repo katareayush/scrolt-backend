@@ -11,6 +11,8 @@ import { progressRouter } from './routes/progress';
 import { authRouter } from './routes/auth';
 import { dailyRouter } from './routes/daily';
 import { friendsRouter } from './routes/friends';
+import { eventsRouter } from './routes/events';
+import { adminRouter } from './routes/admin';
 import { sessionMiddleware } from './middleware/session';
 import { requestLogger, logger } from './middleware/logger';
 import { readLimiter } from './middleware/rateLimit';
@@ -87,6 +89,14 @@ app.use(sessionMiddleware);
 
 app.use('/health', healthRouter);
 
+/**
+ * Admin analytics dashboard. Mounted before the /api read limiter
+ * because it carries its own tighter, IP-keyed limiter (an admin request
+ * has no app userId to key on) and serves HTML, not app API traffic.
+ * Returns 404 throughout unless ADMIN_TOKEN is configured.
+ */
+app.use('/admin', adminRouter);
+
 // Rate-limit GET traffic to /api/*. Health probes above are exempt so a
 // load balancer can poll them freely.
 app.use('/api', readLimiter);
@@ -94,6 +104,7 @@ app.use('/api', readLimiter);
 app.use('/api/auth', authRouter);
 app.use('/api/cards', cardsRouter);
 app.use('/api/daily', dailyRouter);
+app.use('/api/events', eventsRouter);
 app.use('/api/friends', friendsRouter);
 app.use('/api/handoff', handoffRouter);
 app.use('/api/progress', progressRouter);
