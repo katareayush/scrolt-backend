@@ -98,6 +98,20 @@ export const dashboardHtml = String.raw`<!doctype html>
     --shadow:    0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.25);
   }
 
+  /* One type scale and one spacing scale. Every size below comes from
+     these — the old sheet had ten ad-hoc font sizes between 11 and 19px,
+     which is most of why the page read as noisy. */
+  :root {
+    --fs-1: 11.5px;   /* micro labels, table headers */
+    --fs-2: 12.5px;   /* secondary text, notes */
+    --fs-3: 13.5px;   /* body, card titles */
+    --fs-4: 17px;     /* section / KPI values */
+    --fs-5: 24px;     /* secondary KPI figures */
+    --fs-6: 36px;     /* the one hero figure */
+    --s1: 4px; --s2: 8px; --s3: 12px; --s4: 18px; --s5: 26px; --s6: 40px;
+    --r-sm: 7px; --r-md: 10px; --r-lg: 14px;
+  }
+
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   body {
@@ -106,76 +120,141 @@ export const dashboardHtml = String.raw`<!doctype html>
     font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
     -webkit-font-smoothing: antialiased;
   }
-  .wrap { max-width: 1180px; margin: 0 auto; padding: 24px 20px 96px; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 0 var(--s5) var(--s6); }
 
   /* ── header ─────────────────────────────────────────────── */
   header.top {
-    display: flex; align-items: baseline; gap: 12px;
-    flex-wrap: wrap; margin-bottom: 4px;
+    display: flex; align-items: center; gap: var(--s3);
+    padding: var(--s4) 0 var(--s3);
   }
-  header.top h1 { font-size: 19px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
-  .subtle { color: var(--muted); font-size: 12.5px; }
+  header.top h1 {
+    font-size: var(--fs-4); font-weight: 600; margin: 0; letter-spacing: -0.01em;
+  }
+  .chip {
+    font-size: var(--fs-1); color: var(--ink-2); padding: 2px var(--s2);
+    border: 1px solid var(--hairline); border-radius: 999px;
+  }
+  .subtle { color: var(--muted); font-size: var(--fs-2); }
   .grow { flex: 1 1 auto; }
 
-  /* ── filter row (one row, above everything it scopes) ───── */
-  .filters {
-    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
-    margin: 18px 0 22px;
+  /* ── tabs ───────────────────────────────────────────────── */
+  /* The page used to stack nine cards — ~7000px of scroll with no way to
+     get to a specific question. One tab per question, and each tab is
+     about one screen. */
+  .tabs {
+    display: flex; gap: var(--s1); overflow-x: auto;
+    border-bottom: 1px solid var(--hairline);
+    position: sticky; top: 0; z-index: 30;
+    background: var(--page);
   }
-  .seg { display: inline-flex; border: 1px solid var(--hairline); border-radius: 8px; overflow: hidden; background: var(--surface); }
+  .tabs button {
+    appearance: none; border: 0; background: transparent; cursor: pointer;
+    font: inherit; font-size: var(--fs-3); color: var(--muted);
+    padding: var(--s3) var(--s3) calc(var(--s3) - 2px);
+    border-bottom: 2px solid transparent; white-space: nowrap;
+  }
+  .tabs button:hover { color: var(--ink-2); }
+  .tabs button[aria-selected="true"] {
+    color: var(--ink); font-weight: 600; border-bottom-color: var(--series-1);
+  }
+
+  /* ── toolbar (one row, scoping everything below it) ──────── */
+  .filters {
+    display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center;
+    padding: var(--s4) 0;
+  }
+  .filters .lbl {
+    font-size: var(--fs-1); color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .seg { display: inline-flex; border: 1px solid var(--hairline); border-radius: var(--r-sm); overflow: hidden; background: var(--surface); }
   .seg button {
     appearance: none; border: 0; background: transparent; color: var(--ink-2);
-    font: inherit; font-size: 12.5px; padding: 6px 11px; cursor: pointer;
+    font: inherit; font-size: var(--fs-2); padding: 5px var(--s3); cursor: pointer;
     border-right: 1px solid var(--hairline);
   }
   .seg button:last-child { border-right: 0; }
   .seg button[aria-pressed="true"] { background: var(--ink); color: var(--surface); font-weight: 600; }
   .seg button:hover:not([aria-pressed="true"]) { background: var(--grid); }
   .btn {
-    appearance: none; font: inherit; font-size: 12.5px; padding: 6px 12px;
-    border: 1px solid var(--hairline); border-radius: 8px;
+    appearance: none; font: inherit; font-size: var(--fs-2); padding: 5px var(--s3);
+    border: 1px solid var(--hairline); border-radius: var(--r-sm);
     background: var(--surface); color: var(--ink-2); cursor: pointer;
   }
   .btn:hover { background: var(--grid); }
   .btn[aria-pressed="true"] { background: var(--ink); color: var(--surface); font-weight: 600; }
-  label.check { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-2); cursor: pointer; }
+  label.check {
+    display: inline-flex; align-items: center; gap: var(--s2);
+    font-size: var(--fs-2); color: var(--ink-2); cursor: pointer;
+  }
 
   /* ── cards & grid ───────────────────────────────────────── */
+  /* No drop shadow. Nine shadowed panels stacked read as clutter; a
+     hairline is enough separation when the spacing is honest. */
   .card {
     background: var(--surface); border: 1px solid var(--hairline);
-    border-radius: 12px; padding: 18px; box-shadow: var(--shadow);
-    margin-bottom: 16px;
+    border-radius: var(--r-md); padding: var(--s4) var(--s5) var(--s5);
+    margin-bottom: var(--s4);
   }
   .card > h2 {
-    font-size: 13px; font-weight: 600; margin: 0 0 2px;
-    letter-spacing: 0.01em;
+    font-size: var(--fs-3); font-weight: 600; margin: 0;
+    letter-spacing: -0.005em; display: flex; align-items: center; gap: var(--s2);
   }
-  .card > .note { color: var(--muted); font-size: 12px; margin: 0 0 14px; }
-  .cols { display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
-  @media (max-width: 860px) { .cols { grid-template-columns: 1fr; } }
+  .card > .note {
+    color: var(--muted); font-size: var(--fs-2);
+    margin: var(--s1) 0 var(--s4); max-width: 78ch;
+  }
+  /* The long "why this metric is defined this way" prose lives behind
+     this, so it is one click away instead of on screen at all times. */
+  .help {
+    appearance: none; border: 1px solid var(--hairline); background: transparent;
+    color: var(--muted); cursor: help; font: inherit; font-size: 10px;
+    width: 16px; height: 16px; border-radius: 999px; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center; flex: none;
+  }
+  .help:hover { color: var(--ink); border-color: var(--axis); }
+  .cols { display: grid; gap: var(--s4); grid-template-columns: 1fr 1fr; }
+  @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
 
-  /* ── hero + stat tiles ──────────────────────────────────── */
-  .hero { display: flex; align-items: flex-end; gap: 28px; flex-wrap: wrap; }
-  .hero .figure { font-size: 52px; font-weight: 600; line-height: 1; letter-spacing: -0.02em; }
-  .hero .figure-label { color: var(--ink-2); font-size: 13px; margin-bottom: 6px; }
-  .tiles {
-    display: grid; gap: 12px;
-    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
-    margin-top: 18px;
+  /* ── KPI strip ──────────────────────────────────────────── */
+  /* Borderless cells divided by hairlines, on a fixed 4-column grid.
+     'auto-fit' used to leave a single orphan tile on its own row. */
+  .kpis {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    border: 1px solid var(--hairline); border-radius: var(--r-md);
+    background: var(--surface); overflow: hidden;
   }
-  .tile {
-    border: 1px solid var(--hairline); border-radius: 10px; padding: 11px 12px;
-    background: var(--page);
+  .kpi {
+    padding: var(--s3) var(--s4);
+    border-left: 1px solid var(--hairline);
+    border-top: 1px solid var(--hairline);
   }
-  .tile .k { color: var(--ink-2); font-size: 11.5px; margin-bottom: 5px; }
-  .tile .v { font-size: 22px; font-weight: 600; line-height: 1.1; }
-  .tile .sub { color: var(--muted); font-size: 11px; margin-top: 3px; }
+  .kpi:nth-child(4n + 1) { border-left: 0; }
+  .kpi:nth-child(-n + 4) { border-top: 0; }
+  .kpi .k {
+    color: var(--muted); font-size: var(--fs-1);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .kpi .v {
+    font-size: var(--fs-5); font-weight: 600; line-height: 1.15;
+    margin-top: var(--s1); font-variant-numeric: tabular-nums;
+  }
+  .kpi .sub { color: var(--muted); font-size: var(--fs-1); margin-top: 2px; }
+  /* The one figure that gets to be big. */
+  .kpi.lead .v { font-size: var(--fs-6); letter-spacing: -0.02em; }
+  @media (max-width: 900px) {
+    .kpis { grid-template-columns: repeat(2, 1fr); }
+    .kpi:nth-child(4n + 1) { border-left: 1px solid var(--hairline); }
+    .kpi:nth-child(odd) { border-left: 0; }
+    .kpi:nth-child(-n + 4) { border-top: 1px solid var(--hairline); }
+    .kpi:nth-child(-n + 2) { border-top: 0; }
+  }
 
   /* ── charts ─────────────────────────────────────────────── */
   .chart { width: 100%; }
   .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
-  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 0 0 10px; }
-  .legend .item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s4); margin: 0 0 var(--s3); }
+  .legend .item { display: inline-flex; align-items: center; gap: var(--s2); font-size: var(--fs-2); color: var(--ink-2); }
   .legend .swatch { width: 11px; height: 11px; border-radius: 3px; flex: none; }
   .legend .line-key { width: 14px; height: 2px; border-radius: 2px; flex: none; }
   .hit { fill: transparent; cursor: pointer; }
@@ -198,11 +277,11 @@ export const dashboardHtml = String.raw`<!doctype html>
 
   /* ── tables ─────────────────────────────────────────────── */
   .table-wrap { overflow-x: auto; margin-top: 4px; }
-  table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
-  th, td { text-align: right; padding: 7px 10px; white-space: nowrap; }
+  table { border-collapse: collapse; width: 100%; font-size: var(--fs-2); }
+  th, td { text-align: right; padding: var(--s2) var(--s3); white-space: nowrap; }
   th:first-child, td:first-child { text-align: left; }
   thead th {
-    color: var(--ink-2); font-weight: 600; font-size: 11.5px;
+    color: var(--ink-2); font-weight: 600; font-size: var(--fs-1);
     border-bottom: 1px solid var(--axis); position: sticky; top: 0;
     background: var(--surface);
   }
@@ -267,34 +346,36 @@ export const dashboardHtml = String.raw`<!doctype html>
 
 <div class="wrap" id="shell" hidden>
   <header class="top">
-    <h1>Scrolt analytics</h1>
+    <h1>Scrolt</h1>
+    <span class="chip" title="Every metric counts logged-out visitors too. Anonymous ids (anon_*) are one per browser; signing in merges that history into the account, so &quot;logged out&quot; means still-unconverted.">Analytics</span>
     <span class="grow"></span>
     <span class="subtle" id="stamp"></span>
     <button class="btn" id="theme-toggle" type="button" title="Toggle light / dark">Theme</button>
     <button class="btn" id="signout" type="button">Lock</button>
   </header>
-  <p class="subtle" style="margin:0">
-    Every metric counts logged-out visitors too. Anonymous ids
-    (<span class="mono">anon_*</span>) are one per browser; signing in merges
-    that history into the account, so "logged out" means still-unconverted.
-  </p>
 
-  <!-- One filter row, scoping everything below it. -->
+  <!-- One tab per question. Only the active tab is built, so a chart is
+       never laid out inside a hidden container at zero width. -->
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Sections"></nav>
+
+  <!-- One toolbar, scoping everything below it. Controls that apply to a
+       single tab (cohort width) are revealed only on that tab. -->
   <div class="filters" role="group" aria-label="Filters">
-    <span class="subtle">Range</span>
+    <span class="lbl">Range</span>
     <div class="seg" id="range-seg">
       <button type="button" data-days="7">7d</button>
       <button type="button" data-days="30">30d</button>
       <button type="button" data-days="90">90d</button>
       <button type="button" data-days="365">1y</button>
     </div>
-    <span class="subtle" style="margin-left:8px">Cohorts</span>
-    <div class="seg" id="weeks-seg">
+    <span class="lbl" id="weeks-lbl" hidden>Cohorts</span>
+    <div class="seg" id="weeks-seg" hidden>
       <button type="button" data-weeks="4">4w</button>
       <button type="button" data-weeks="8">8w</button>
       <button type="button" data-weeks="16">16w</button>
     </div>
-    <label class="check" style="margin-left:8px">
+    <span class="grow"></span>
+    <label class="check">
       <input type="checkbox" id="only-authed"> Signed-in only
     </label>
     <button class="btn" id="tables-toggle" type="button" aria-pressed="false">Data tables</button>
@@ -311,6 +392,7 @@ export const dashboardHtml = String.raw`<!doctype html>
 
   var TOKEN_KEY = "scrolt_admin_token";
   var THEME_KEY = "scrolt_admin_theme";
+  var TAB_KEY = "scrolt_admin_tab";
 
   // Base for every API call. Derived from the current path rather than
   // hardcoded so the page works whether it was served at /admin or
@@ -322,6 +404,7 @@ export const dashboardHtml = String.raw`<!doctype html>
   var state = {
     token: null,
     data: null,
+    tab: "overview",
     days: 30,
     weeks: 8,
     onlyAuthed: false,
@@ -517,7 +600,7 @@ export const dashboardHtml = String.raw`<!doctype html>
       }));
       var lbl = svg("text", {
         x: padL - 8, y: gy + 3.5, "text-anchor": "end",
-        fill: cssVar("--muted"), "font-size": 10.5,
+        fill: cssVar("--muted"), "font-size": 11.5,
         style: "font-variant-numeric:tabular-nums"
       });
       lbl.textContent = fmt(Math.round(val));
@@ -556,7 +639,7 @@ export const dashboardHtml = String.raw`<!doctype html>
         var capY = padT + plotH - (totals[i] / max) * plotH;
         var dl = svg("text", {
           x: cx + barW / 2, y: Math.max(padT - 4, capY - 7), "text-anchor": "middle",
-          fill: cssVar("--ink"), "font-size": 11, "font-weight": 600
+          fill: cssVar("--ink"), "font-size": 12, "font-weight": 600
         });
         dl.textContent = fmt(totals[i]);
         root.appendChild(dl);
@@ -591,7 +674,7 @@ export const dashboardHtml = String.raw`<!doctype html>
       if (xi !== points.length - 1 && points.length - 1 - xi < every * 0.6) continue;
       var xt = svg("text", {
         x: padL + band * xi + band / 2, y: H - 10, "text-anchor": "middle",
-        fill: cssVar("--muted"), "font-size": 10.5
+        fill: cssVar("--muted"), "font-size": 11.5
       });
       xt.textContent = shortDay(points[xi].day);
       root.appendChild(xt);
@@ -643,7 +726,7 @@ export const dashboardHtml = String.raw`<!doctype html>
       }));
       var lb = svg("text", {
         x: padL - 8, y: gy + 3.5, "text-anchor": "end",
-        fill: cssVar("--muted"), "font-size": 10.5
+        fill: cssVar("--muted"), "font-size": 11.5
       });
       lb.textContent = Math.round(val) + (opts.suffix || "");
       root.appendChild(lb);
@@ -664,7 +747,7 @@ export const dashboardHtml = String.raw`<!doctype html>
         if (opts.labelLast && i === groups.length - 1) {
           var vt = svg("text", {
             x: x + inner / 2, y: Math.max(padT - 5, y - 6), "text-anchor": "middle",
-            fill: cssVar("--ink"), "font-size": 10.5, "font-weight": 600
+            fill: cssVar("--ink"), "font-size": 11.5, "font-weight": 600
           });
           vt.textContent = Math.round(v) + (opts.suffix || "");
           root.appendChild(vt);
@@ -684,14 +767,14 @@ export const dashboardHtml = String.raw`<!doctype html>
 
       var xt = svg("text", {
         x: padL + band * i + band / 2, y: H - 12, "text-anchor": "middle",
-        fill: cssVar("--ink-2"), "font-size": 11
+        fill: cssVar("--ink-2"), "font-size": 12
       });
       xt.textContent = g.label;
       root.appendChild(xt);
       if (g.sublabel) {
         var st = svg("text", {
           x: padL + band * i + band / 2, y: H - 1, "text-anchor": "middle",
-          fill: cssVar("--muted"), "font-size": 9.5
+          fill: cssVar("--muted"), "font-size": 12
         });
         st.textContent = g.sublabel;
         root.appendChild(st);
@@ -759,9 +842,23 @@ export const dashboardHtml = String.raw`<!doctype html>
   }
 
   // ── sections ──────────────────────────────────────────────
-  function card(title, note) {
+  /**
+   * 'note' is the one-line orientation that earns its place on screen.
+   * 'help' is the long definitional prose — it hangs off a hover/focus
+   * affordance instead, because nine paragraphs of it stacked down the
+   * page was the single biggest source of visual noise.
+   */
+  function card(title, note, help) {
     var c = el("div", "card");
-    c.appendChild(el("h2", null, title));
+    var h = el("h2", null, title);
+    if (help) {
+      var q = el("button", "help", "i");
+      q.type = "button";
+      q.title = help;
+      q.setAttribute("aria-label", title + " — " + help);
+      h.appendChild(q);
+    }
+    c.appendChild(h);
     if (note) c.appendChild(el("p", "note", note));
     return c;
   }
@@ -829,57 +926,52 @@ export const dashboardHtml = String.raw`<!doctype html>
   /** Registered chart re-draw callbacks, replayed on resize. */
   var redraws = [];
 
+  /**
+   * The KPI strip. Twelve numbers on a fixed 4-column grid: the lead
+   * figure, three supporting rates, then the all-time totals. Replaces a
+   * 52px hero plus eight individually-bordered tiles that wrapped to an
+   * orphan row at every common window width.
+   */
   function sectionHeadline(d) {
     var o = d.overview.totals;
-    var c = card("Right now", null);
-    var hero = el("div", "hero");
-    var block = el("div");
-    block.appendChild(el("div", "figure-label", "Active in the last 7 days"));
-    var fig = el("div", "figure", fmt(o.wau));
-    block.appendChild(fig);
-    hero.appendChild(block);
+    var wrap = el("div");
 
-    var side = el("div");
-    side.style.paddingBottom = "6px";
-    var line1 = el("div", "subtle");
-    line1.textContent =
-      fmt(o.dau) + " today · " + fmt(o.mau) + " in 30 days · " +
-      (o.stickiness === null ? "—" : pctStr(o.stickiness)) + " DAU/MAU stickiness";
-    side.appendChild(line1);
-    var line2 = el("div", "subtle");
-    line2.style.marginTop = "4px";
-    line2.textContent =
-      "Of the last 30 days' actives, " + fmt(o.mauAuthed) + " signed in and " +
-      fmt(o.mauAnon) + " stayed logged out.";
-    side.appendChild(line2);
-    hero.appendChild(side);
-    c.appendChild(hero);
-
-    var tiles = el("div", "tiles");
-    function tile(k, v, sub) {
-      var t = el("div", "tile");
+    var grid = el("div", "kpis");
+    function kpi(k, v, sub, lead) {
+      var t = el("div", "kpi" + (lead ? " lead" : ""));
       t.appendChild(el("div", "k", k));
       t.appendChild(el("div", "v", v));
-      if (sub) t.appendChild(el("div", "sub", sub));
+      t.appendChild(el("div", "sub", sub || ""));
       return t;
     }
-    tiles.appendChild(tile("Accounts", fmt(o.totalAccounts), "signed up all time"));
-    tiles.appendChild(tile("People seen", fmt(o.everActive),
+
+    grid.appendChild(kpi("Active · 7 days", fmt(o.wau),
+      fmt(o.dau) + " today", true));
+    grid.appendChild(kpi("Active · 30 days", fmt(o.mau),
+      fmt(o.mauAuthed) + " signed in · " + fmt(o.mauAnon) + " logged out"));
+    grid.appendChild(kpi("Stickiness",
+      o.stickiness === null ? "—" : pctStr(o.stickiness), "DAU / MAU"));
+    grid.appendChild(kpi("Sign-up rate", pctStr(o.signupRate), "of everyone seen"));
+
+    grid.appendChild(kpi("Accounts", fmt(o.totalAccounts), "all time"));
+    grid.appendChild(kpi("People seen", fmt(o.everActive),
       fmt(o.everActiveAnon) + " never signed in"));
-    tiles.appendChild(tile("Sign-up rate", pctStr(o.signupRate), "of everyone seen"));
-    tiles.appendChild(tile("Answers", fmt(o.answersAllTime), "first tries, all time"));
-    tiles.appendChild(tile("Accuracy", pctStr(o.accuracyAllTime), "first try correct"));
-    tiles.appendChild(tile("Catalogue", fmt(o.totalCards), "cards live"));
-    tiles.appendChild(tile("Daily challenge", fmt(o.dailyCompletions), "completions"));
-    tiles.appendChild(tile("Friendships", fmt(o.friendships), "mutual pairs"));
-    c.appendChild(tiles);
-    return c;
+    grid.appendChild(kpi("Answers", fmt(o.answersAllTime), "first tries"));
+    grid.appendChild(kpi("Accuracy", pctStr(o.accuracyAllTime), "first try correct"));
+
+    grid.appendChild(kpi("Catalogue", fmt(o.totalCards), "cards live"));
+    grid.appendChild(kpi("Daily challenge", fmt(o.dailyCompletions), "completions"));
+    grid.appendChild(kpi("Friendships", fmt(o.friendships), "mutual pairs"));
+    grid.appendChild(kpi("Events kept", fmt(d.retentionDays) + "d", "then pruned"));
+
+    wrap.appendChild(grid);
+    return wrap;
   }
 
   function sectionActivity(d) {
     var pts = d.overview.series;
-    var c = card("Active users per day",
-      "One count per person per day, from answers, daily challenges and session events.");
+    var c = card("Active users per day", "Signed in versus still logged out.",
+      "One count per person per day, drawn from answers, daily challenges and session events.");
     var series = [
       { key: "activeAuthed", label: "Signed in", color: function () { return cssVar("--series-1"); } },
       { key: "activeAnon", label: "Logged out", color: function () { return cssVar("--series-2"); } }
@@ -921,8 +1013,8 @@ export const dashboardHtml = String.raw`<!doctype html>
 
   function sectionVolume(d) {
     var pts = d.overview.series;
-    var c = card("Cards answered per day",
-      "New cards answered for the first time — the learning-progress signal. Replays are counted separately in the mode table.");
+    var c = card("Cards answered per day", "First-time answers only.",
+      "New cards answered for the first time — the learning-progress signal. Replays are counted separately, in the mode table.");
     var series = [
       { key: "newCards", label: "New cards", color: function () { return cssVar("--series-1"); } }
     ];
@@ -951,7 +1043,7 @@ export const dashboardHtml = String.raw`<!doctype html>
 
   function sectionRetention(d) {
     var r = d.retention;
-    var c = card("Retention",
+    var c = card("Retention", "Share returning on day N or later.",
       "Of the people who had the chance to come back, the share that returned on day N or later. Unbounded on purpose — at this volume an exact-day-N rule is mostly zeroes.");
 
     var groups = r.returnedByDay.map(function (m) {
@@ -1012,8 +1104,8 @@ export const dashboardHtml = String.raw`<!doctype html>
 
   function sectionCohorts(d) {
     var r = d.retention;
-    var c = card("Weekly cohorts",
-      "Each row is everyone whose first visit fell in that week. Week N counts how many were still active N weeks after their own first day. Blank means that week hasn't happened yet.");
+    var c = card("Weekly cohorts", "Grouped by first-visit week.",
+      "Each row is everyone whose first visit fell in that week. Week N counts how many were still active N weeks after their own first day. Blank means that week has not happened yet.");
 
     if (!r.cohorts.length) {
       c.appendChild(el("div", "empty", "No cohorts in this window yet."));
@@ -1092,8 +1184,8 @@ export const dashboardHtml = String.raw`<!doctype html>
 
   function sectionModes(d) {
     var m = d.modes;
-    var c = card("What people play",
-      "From session and answer events, so this only covers traffic since the instrumented app shipped. Unlike the card table below, it counts replays.");
+    var c = card("What people play", "Sessions and answers per mode.",
+      "From session and answer events, so this only covers traffic since the instrumented app shipped. Unlike the card tables, it counts replays.");
 
     if (!m.modes.length) {
       c.appendChild(el("div", "empty",
@@ -1171,8 +1263,8 @@ export const dashboardHtml = String.raw`<!doctype html>
     var ct = d.content;
     var grid = el("div", "cols");
 
-    var hard = card("Hardest cards",
-      "Lowest first-try accuracy. A card far below the rest is usually ambiguous wording, not difficulty.");
+    var hard = card("Hardest cards", "Lowest first-try accuracy.",
+      "A card sitting far below the rest is usually ambiguous wording rather than genuine difficulty.");
     hard.appendChild(table([
       { key: "answer", label: "Answer" },
       { key: "category", label: "Category", render: function (r) {
@@ -1182,8 +1274,8 @@ export const dashboardHtml = String.raw`<!doctype html>
     ], ct.hardest, { emptyText: "No card has been missed enough times to rank yet." }));
     grid.appendChild(hard);
 
-    var easy = card("Easiest cards",
-      "Highest first-try accuracy — candidates for retiring or re-weighting.");
+    var easy = card("Easiest cards", "Highest first-try accuracy.",
+      "Candidates for retiring or re-weighting — they are no longer teaching anyone anything.");
     easy.appendChild(table([
       { key: "answer", label: "Answer" },
       { key: "category", label: "Category", render: function (r) {
@@ -1197,7 +1289,8 @@ export const dashboardHtml = String.raw`<!doctype html>
     wrapper.appendChild(grid);
 
     var bycat = card("Reach by category",
-      "How much of the catalogue is actually being seen. " + fmt(ct.unseen) + " cards have never been answered by anyone.");
+      fmt(ct.unseen) + " cards have never been answered by anyone.",
+      "How much of the catalogue is actually being seen. A category with few answers is either under-weighted in the feed or too small.");
     var catHost = el("div", "chart");
     bycat.appendChild(catHost);
     var catRows = ct.byCategory.map(function (r) {
@@ -1231,9 +1324,8 @@ export const dashboardHtml = String.raw`<!doctype html>
   var userSort = { key: "lastSeen", desc: true };
 
   function sectionUsers(d) {
-    var c = card("Everyone, most recent first",
-      "Anonymous and signed-in side by side. " +
-      "Answers and accuracy come from first-try history; sessions and top mode need event data.");
+    var c = card("People", "Anonymous and signed-in, most recent first.",
+      "Answers and accuracy come from first-try history; sessions and top mode need event data, so they are blank for anyone last seen before the instrumented app shipped.");
 
     var rows = d.users.slice();
     var k = userSort.key;
@@ -1299,8 +1391,8 @@ export const dashboardHtml = String.raw`<!doctype html>
   }
 
   function sectionEvents(d) {
-    var c = card("Latest events",
-      "A live tail — the quickest way to confirm the app is actually reporting.");
+    var c = card("Latest events", "A live tail of incoming events.",
+      "The quickest way to confirm the app is actually reporting — if this is empty, the frontend is not sending.");
     if (!d.events.length) {
       c.appendChild(el("div", "empty", "Nothing yet."));
       return c;
@@ -1330,27 +1422,106 @@ export const dashboardHtml = String.raw`<!doctype html>
   // ── render ────────────────────────────────────────────────
   var app = document.getElementById("app");
 
+  /**
+   * One tab per question. The KPI strip is pinned above every tab, because
+   * "how many people are here" is context for all of them.
+   *
+   * Only the active tab is built. That is not just a rendering economy: the
+   * chart renderers size themselves from 'host.clientWidth', which is 0
+   * inside a 'hidden' container, so a pre-built hidden tab would lay its
+   * charts out at zero width and never recover without a resize.
+   */
+  var TABS = [
+    {
+      id: "overview", label: "Overview",
+      build: function (d) { return [sectionActivity(d), sectionVolume(d)]; }
+    },
+    {
+      id: "retention", label: "Retention",
+      build: function (d) {
+        var rg = el("div", "cols");
+        rg.appendChild(sectionRetention(d));
+        rg.appendChild(sectionCohorts(d));
+        return [rg];
+      }
+    },
+    {
+      id: "modes", label: "Modes",
+      build: function (d) { return [sectionModes(d)]; }
+    },
+    {
+      id: "content", label: "Content",
+      build: function (d) { return [sectionContent(d)]; }
+    },
+    {
+      id: "people", label: "People",
+      build: function (d) { return [sectionUsers(d)]; }
+    },
+    {
+      id: "events", label: "Events",
+      build: function (d) { return [sectionEvents(d)]; }
+    }
+  ];
+
+  function activeTab() {
+    for (var i = 0; i < TABS.length; i++) {
+      if (TABS[i].id === state.tab) return TABS[i];
+    }
+    return TABS[0];
+  }
+
+  var tabsNav = document.getElementById("tabs");
+
+  function buildTabs() {
+    clear(tabsNav);
+    TABS.forEach(function (t) {
+      var b = el("button", null, t.label);
+      b.type = "button";
+      b.setAttribute("role", "tab");
+      b.setAttribute("data-tab", t.id);
+      b.addEventListener("click", function () { selectTab(t.id); });
+      tabsNav.appendChild(b);
+    });
+  }
+
+  function syncTabs() {
+    var kids = tabsNav.children;
+    for (var i = 0; i < kids.length; i++) {
+      var on = kids[i].getAttribute("data-tab") === state.tab;
+      kids[i].setAttribute("aria-selected", on ? "true" : "false");
+    }
+    // Cohort width only means anything on the retention tab.
+    var onRetention = state.tab === "retention";
+    document.getElementById("weeks-seg").hidden = !onRetention;
+    document.getElementById("weeks-lbl").hidden = !onRetention;
+  }
+
+  function selectTab(id) {
+    if (state.tab === id) return;
+    state.tab = id;
+    try { sessionStorage.setItem(TAB_KEY, id); } catch (e) { /* private mode */ }
+    syncTabs();
+    render();
+  }
+
   function render() {
     if (!state.data) return;
     redraws = [];
     var d = state.data;
     clear(app);
     app.appendChild(sectionHeadline(d));
-    app.appendChild(sectionActivity(d));
-    app.appendChild(sectionVolume(d));
-    var rg = el("div", "cols");
-    rg.appendChild(sectionRetention(d));
-    rg.appendChild(sectionCohorts(d));
-    app.appendChild(rg);
-    app.appendChild(sectionModes(d));
-    app.appendChild(sectionContent(d));
-    app.appendChild(sectionUsers(d));
-    app.appendChild(sectionEvents(d));
+    activeTab().build(d).forEach(function (node) { app.appendChild(node); });
+
+    // Every chart sizes itself from host.clientWidth, but the sections are
+    // built detached — so the first pass measures 0 and falls back to 640px,
+    // which CSS then scales up to the real width, inflating the height and
+    // every stroke and label with it. Redraw now that they are mounted and
+    // can measure honestly.
+    for (var ri = 0; ri < redraws.length; ri++) redraws[ri]();
 
     var stamp = document.getElementById("stamp");
     var gen = new Date(d.generatedAt);
-    stamp.textContent = "updated " + (isNaN(gen.getTime()) ? "" : gen.toLocaleTimeString()) +
-      " · events kept " + d.retentionDays + "d";
+    stamp.textContent = isNaN(gen.getTime()) ? "" : "updated " + gen.toLocaleTimeString();
   }
 
   var resizeTimer = null;
@@ -1506,6 +1677,13 @@ export const dashboardHtml = String.raw`<!doctype html>
     if (savedTheme) document.documentElement.setAttribute("data-theme", savedTheme);
   } catch (e) {}
 
+  try {
+    var savedTab = sessionStorage.getItem(TAB_KEY);
+    if (savedTab) state.tab = savedTab;
+  } catch (e) {}
+
+  buildTabs();
+  syncTabs();
   syncSeg("range-seg", "data-days", state.days);
   syncSeg("weeks-seg", "data-weeks", state.weeks);
 
