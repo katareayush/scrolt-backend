@@ -35,3 +35,30 @@ jobs:
       # Tests touch only the pure algorithm module — no DB / Redis needed.
       - name: Unit tests
         run: npm test
+
+  # ── deploy ──────────────────────────────────────────────────────────
+  # Push to main only, and only once the tests above are green. SSHes into
+  # the EC2 box and runs deploy/deploy.sh (pull → build → migrate → swap →
+  # health-check). Requires repo secrets: EC2_HOST, EC2_USER, EC2_SSH_KEY.
+  deploy:
+    name: deploy to ec2
+    needs: backend
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-ec2
+      cancel-in-progress: false
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 15m
+          script: |
+            set -e
+            cd /opt/scrolt/backend
+            git fetch --all --prune
+            git reset --hard origin/main
+            bash deploy/deploy.sh
