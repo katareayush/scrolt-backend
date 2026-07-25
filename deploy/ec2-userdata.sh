@@ -8,13 +8,13 @@ set -euxo pipefail
 # Security group inbound: 22 (you), 80 + 443 (0.0.0.0/0 — Caddy needs both).
 #
 # PREREQ (the only manual step): point a DNS A-record at this instance's
-# public IP, e.g.  api.scrolt.app -> <public-ip>.  Caddy uses it to get a
+# public IP, e.g.  api.scrolt.com -> <public-ip>.  Caddy uses it to get a
 # free auto-renewing TLS cert. Without HTTPS the Vercel frontend can't call
 # this API (mixed content). Set the four values below, launch, done.
 # ─────────────────────────────────────────────────────────────────────────
 
 # ===== FILL THESE FOUR =====================================================
-API_DOMAIN="api.scrolt.app"                       # the A-record you created
+API_DOMAIN="api.scrolt.com"                       # the A-record you created
 DATABASE_URL="postgresql://USER:PASS@HOST/DB?sslmode=require"   # Neon pooler URL
 AUTH_SECRET="REPLACE_WITH_32B_SECRET"             # MUST equal frontend AUTH_SECRET
 CORS_ORIGINS="https://scrolt.vercel.app"          # your frontend origin(s), comma-sep
