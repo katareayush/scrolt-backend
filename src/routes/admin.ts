@@ -70,6 +70,12 @@ adminRouter.get('/api/summary', adminLimiter, requireAdmin, async (req, res) => 
   const weeks = intParam(req.query.weeks, 8, 1, 52);
   const userLimit = intParam(req.query.users, 50, 1, 500);
   const minAnswers = intParam(req.query.minAnswers, 3, 1, 1000);
+  // The dashboard pages these tables client-side off this one payload, so
+  // the ceilings are what the operator can actually reach by paging. They
+  // are deliberately generous; the page states the cap in the pager footer
+  // whenever a table comes back at its limit.
+  const eventLimit = intParam(req.query.events, 200, 1, 2000);
+  const cardLimit = intParam(req.query.cards, 25, 1, 500);
   const onlyAuthed = req.query.onlyAuthed === '1';
 
   try {
@@ -78,9 +84,9 @@ adminRouter.get('/api/summary', adminLimiter, requireAdmin, async (req, res) => 
         getOverview(days),
         getRetention(weeks),
         getModes(days),
-        getContent(minAnswers, 12),
+        getContent(minAnswers, cardLimit),
         getUsers(userLimit, onlyAuthed),
-        getRecentEvents(30),
+        getRecentEvents(eventLimit),
       ]),
     );
 
@@ -89,7 +95,7 @@ adminRouter.get('/api/summary', adminLimiter, requireAdmin, async (req, res) => 
 
     res.json({
       generatedAt: new Date().toISOString(),
-      params: { days, weeks, userLimit, minAnswers, onlyAuthed },
+      params: { days, weeks, userLimit, minAnswers, eventLimit, cardLimit, onlyAuthed },
       retentionDays: env.ANALYTICS_RETENTION_DAYS,
       overview,
       retention,
