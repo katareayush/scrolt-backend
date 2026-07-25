@@ -1,18 +1,7 @@
 /**
- * One-time repair: rewrite stored option order so the correct answer
- * isn't always first.
- *
- * The generated catalog was written answer-first — 1085 of 1086 cards
- * had `answer` at index 0 — so "always tap the top option" scored ~100%.
- * Serving already normalizes order via `shuffleOptions` (see
- * cardService), but the stored rows stay biased, which anything reading
- * `cards` directly (admin, exports, a future consumer) would inherit.
- * This aligns the data with what the API serves.
- *
- * Safe to re-run: `shuffleOptions` is idempotent and keyed on option
- * text, so a second pass updates nothing. Only `options` is written —
- * `answer` is untouched, and rows whose answer isn't in their options
- * are skipped and reported rather than rewritten.
+ * Rewrite stored option order so the answer isn't always first, matching
+ * what the API already serves. Re-run after each seed batch — the
+ * generator writes answer-first. Only `options` is touched.
  *
  *   npx ts-node src/scripts/shuffleCardOptions.ts [--dry-run]
  */

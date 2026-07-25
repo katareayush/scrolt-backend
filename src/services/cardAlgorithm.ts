@@ -54,26 +54,10 @@ export function fnv1aNormalized(s: string): number {
 }
 
 /**
- * Deterministic option order for a card.
- *
- * The generated catalog was written answer-first (1085 of 1086 cards had
- * the correct option at index 0), which made "always tap the first one"
- * a winning strategy. Rather than trusting stored order, every read path
- * runs options through this.
- *
- * The sort key hashes the option TEXT (not its index), which makes the
- * function:
- * - idempotent — re-shuffling an already-shuffled array is a no-op, so
- *   it can be applied to freshly-fetched rows and to cached payloads
- *   written by an older build without flip-flopping;
- * - stable — the same card shows the same order on every render, reload
- *   and device, so a re-read of a card the user already saw doesn't move
- *   the buttons under them;
- * - per-card — `cardId` is in the key, so the correct answer doesn't
- *   cluster at one position across the catalog.
- *
- * Ties (identical hashes) fall back to lexical order so the result never
- * depends on input order.
+ * Deterministic option order — the catalog is generated answer-first, so
+ * stored order can't be trusted. Hashing the option TEXT (not its index)
+ * makes this stable per card and idempotent, so it can also be applied to
+ * cached payloads written before this existed.
  */
 export function shuffleOptions(cardId: string, options: string[]): string[] {
   return options

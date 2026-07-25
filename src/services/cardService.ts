@@ -79,12 +79,7 @@ export class CardService {
     return `${prefix}:${keys.join(':')}`;
   }
 
-  /**
-   * Normalize option order on the way out. Applied at every return
-   * boundary — including cache hits, since payloads written by an older
-   * build still carry the answer-first order from the catalog. Safe to
-   * apply repeatedly: `shuffleOptions` is idempotent.
-   */
+  /** Normalize option order on the way out, cache hits included. */
   private shuffled<T extends { id: string; options: string[] }>(rows: T[]): T[] {
     return rows.map(withShuffledOptions);
   }
