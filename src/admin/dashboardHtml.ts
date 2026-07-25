@@ -15,11 +15,20 @@
  * - Untrusted values (user ids, emails, card text) are inserted with
  *   textContent / createTextNode only — never innerHTML.
  *
- * Colours come from the validated reference data-viz palette; the three
- * categorical slots in use (blue / orange / aqua) pass the CVD and
- * lightness gates in both light and dark mode. Light-mode aqua sits
- * below 3:1 against the surface, so every chart that uses it also ships
- * visible labels and a table view.
+ * Layout rules this page holds itself to:
+ * - One 1180px column, one 8px spacing scale, one radius scale. Every
+ *   card is the same width and the same internal padding, so the page
+ *   reads as a single grid rather than a pile of panels.
+ * - Four pinned KPIs — not twelve. The rest of the all-time figures live
+ *   on the Overview tab where they are one glance, not a permanent wall.
+ * - Every table on the page is the same component: search, sort, page
+ *   size, pager. No table is ever longer than its page size, so no tab
+ *   can grow into an endless scroll.
+ *
+ * Chart colours come from the validated reference data-viz palette; the
+ * categorical slots in use (blue / orange) pass the CVD and lightness
+ * gates in both light and dark mode. Page chrome is deliberately neutral
+ * so the only saturated ink on screen is data.
  */
 export const dashboardHtml = String.raw`<!doctype html>
 <html lang="en">
@@ -30,42 +39,48 @@ export const dashboardHtml = String.raw`<!doctype html>
 <title>Scrolt · Analytics</title>
 <!-- Inline SVG favicon: stops the browser requesting /favicon.ico (which
      the API has no route for) without adding an external fetch. -->
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='4' fill='%232a78d6'/><rect x='4' y='8' width='2' height='5' fill='white'/><rect x='7' y='5' width='2' height='8' fill='white'/><rect x='10' y='3' width='2' height='10' fill='white'/></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='4' fill='%23ea580c'/><rect x='4' y='8' width='2' height='5' fill='white'/><rect x='7' y='5' width='2' height='8' fill='white'/><rect x='10' y='3' width='2' height='10' fill='white'/></svg>">
 <style>
+  /* ── tokens ─────────────────────────────────────────────── */
   :root {
     color-scheme: light;
-    --page:           #f9f9f7;
-    --surface:        #fcfcfb;
-    --ink:            #0b0b0b;
-    --ink-2:          #52514e;
-    --muted:          #898781;
-    --grid:           #e1e0d9;
-    --axis:           #c3c2b7;
-    --hairline:       rgba(11,11,11,0.10);
-    --series-1:       #2a78d6;
-    --series-2:       #eb6834;
-    --series-3:       #1baf7a;
-    --seq-100:        #cde2fb;
-    --seq-250:        #86b6ef;
-    --seq-400:        #3987e5;
-    --seq-550:        #1c5cab;
-    --seq-700:        #0d366b;
-    --good:           #0ca30c;
-    --warning:        #fab219;
-    --critical:       #d03b3b;
-    --shadow:         0 1px 2px rgba(11,11,11,0.05), 0 8px 24px rgba(11,11,11,0.04);
+    --page:      #fafaf9;
+    --surface:   #ffffff;
+    --surface-2: #f5f4f2;
+    --ink:       #18181b;
+    --ink-2:     #52525b;
+    --muted:     #8b8a84;
+    --line:      #e8e6e2;
+    --line-2:    #d5d2cc;
+    --brand:     #ea580c;
+    --grid:      #edebe7;
+    --axis:      #c9c6c0;
+    --series-1:  #2a78d6;
+    --series-2:  #eb6834;
+    --series-3:  #1baf7a;
+    --seq-100:   #cde2fb;
+    --seq-250:   #86b6ef;
+    --seq-400:   #3987e5;
+    --seq-550:   #1c5cab;
+    --seq-700:   #0d366b;
+    --good:      #0ca30c;
+    --warning:   #fab219;
+    --critical:  #d03b3b;
   }
   @media (prefers-color-scheme: dark) {
     :root:where(:not([data-theme="light"])) {
       color-scheme: dark;
-      --page:      #0d0d0d;
-      --surface:   #1a1a19;
-      --ink:       #ffffff;
-      --ink-2:     #c3c2b7;
-      --muted:     #898781;
-      --grid:      #2c2c2a;
-      --axis:      #383835;
-      --hairline:  rgba(255,255,255,0.10);
+      --page:      #0a0a0a;
+      --surface:   #131313;
+      --surface-2: #1b1b1a;
+      --ink:       #fafaf9;
+      --ink-2:     #b4b2ac;
+      --muted:     #86847d;
+      --line:      #262624;
+      --line-2:    #3a3a37;
+      --brand:     #fb923c;
+      --grid:      #232322;
+      --axis:      #3d3d3a;
       --series-1:  #3987e5;
       --series-2:  #d95926;
       --series-3:  #199e70;
@@ -74,19 +89,21 @@ export const dashboardHtml = String.raw`<!doctype html>
       --seq-400:   #256abf;
       --seq-550:   #3987e5;
       --seq-700:   #86b6ef;
-      --shadow:    0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.25);
     }
   }
   :root[data-theme="dark"] {
     color-scheme: dark;
-    --page:      #0d0d0d;
-    --surface:   #1a1a19;
-    --ink:       #ffffff;
-    --ink-2:     #c3c2b7;
-    --muted:     #898781;
-    --grid:      #2c2c2a;
-    --axis:      #383835;
-    --hairline:  rgba(255,255,255,0.10);
+    --page:      #0a0a0a;
+    --surface:   #131313;
+    --surface-2: #1b1b1a;
+    --ink:       #fafaf9;
+    --ink-2:     #b4b2ac;
+    --muted:     #86847d;
+    --line:      #262624;
+    --line-2:    #3a3a37;
+    --brand:     #fb923c;
+    --grid:      #232322;
+    --axis:      #3d3d3a;
     --series-1:  #3987e5;
     --series-2:  #d95926;
     --series-3:  #199e70;
@@ -95,21 +112,20 @@ export const dashboardHtml = String.raw`<!doctype html>
     --seq-400:   #256abf;
     --seq-550:   #3987e5;
     --seq-700:   #86b6ef;
-    --shadow:    0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.25);
   }
 
-  /* One type scale and one spacing scale. Every size below comes from
-     these — the old sheet had ten ad-hoc font sizes between 11 and 19px,
-     which is most of why the page read as noisy. */
+  /* One type scale, one spacing scale, one radius scale. Nothing on the
+     page is allowed a size that isn't listed here. */
   :root {
-    --fs-1: 11.5px;   /* micro labels, table headers */
-    --fs-2: 12.5px;   /* secondary text, notes */
-    --fs-3: 13.5px;   /* body, card titles */
-    --fs-4: 17px;     /* section / KPI values */
-    --fs-5: 24px;     /* secondary KPI figures */
-    --fs-6: 36px;     /* the one hero figure */
-    --s1: 4px; --s2: 8px; --s3: 12px; --s4: 18px; --s5: 26px; --s6: 40px;
-    --r-sm: 7px; --r-md: 10px; --r-lg: 14px;
+    --fs-1: 11px;     /* micro caps: column heads, KPI keys */
+    --fs-2: 12.5px;   /* secondary text, table cells */
+    --fs-3: 13.5px;   /* body, tabs, card titles */
+    --fs-4: 15px;     /* section titles */
+    --fs-5: 21px;     /* supporting figures */
+    --fs-6: 34px;     /* the pinned KPI figures */
+    --s1: 4px; --s2: 8px; --s3: 12px; --s4: 20px; --s5: 32px; --s6: 48px;
+    --r-1: 6px; --r-2: 10px; --r-3: 14px;
+    --col: 1180px;
   }
 
   * { box-sizing: border-box; }
@@ -117,216 +133,315 @@ export const dashboardHtml = String.raw`<!doctype html>
   body {
     background: var(--page);
     color: var(--ink);
-    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    font: 400 var(--fs-3)/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
-  .wrap { max-width: 1240px; margin: 0 auto; padding: 0 var(--s5) var(--s6); }
-
-  /* ── header ─────────────────────────────────────────────── */
-  header.top {
-    display: flex; align-items: center; gap: var(--s3);
-    padding: var(--s4) 0 var(--s3);
-  }
-  header.top h1 {
-    font-size: var(--fs-4); font-weight: 600; margin: 0; letter-spacing: -0.01em;
-  }
-  .chip {
-    font-size: var(--fs-1); color: var(--ink-2); padding: 2px var(--s2);
-    border: 1px solid var(--hairline); border-radius: 999px;
-  }
-  .subtle { color: var(--muted); font-size: var(--fs-2); }
+  .wrap { max-width: var(--col); margin: 0 auto; padding: 0 var(--s5); }
   .grow { flex: 1 1 auto; }
+  .subtle { color: var(--muted); font-size: var(--fs-2); }
+  .num { font-variant-numeric: tabular-nums; }
+  [hidden] { display: none !important; }
+  :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--r-1); }
 
-  /* ── tabs ───────────────────────────────────────────────── */
-  /* The page used to stack nine cards — ~7000px of scroll with no way to
-     get to a specific question. One tab per question, and each tab is
-     about one screen. */
-  .tabs {
-    display: flex; gap: var(--s1); overflow-x: auto;
-    border-bottom: 1px solid var(--hairline);
+  /* ── top bar ────────────────────────────────────────────── */
+  /* Identity row and tab row share one sticky container, so they can
+     never separate or double-stack at a scroll position. */
+  .topbar {
     position: sticky; top: 0; z-index: 30;
     background: var(--page);
+    border-bottom: 1px solid var(--line);
   }
+  .bar { display: flex; align-items: center; gap: var(--s3); height: 60px; }
+  .mark {
+    width: 20px; height: 20px; border-radius: var(--r-1);
+    background: var(--brand); flex: none;
+  }
+  .bar h1 {
+    font-size: var(--fs-4); font-weight: 600; margin: 0;
+    letter-spacing: -0.015em;
+  }
+  .chip {
+    font-size: var(--fs-1); color: var(--ink-2); padding: 3px var(--s2);
+    border: 1px solid var(--line); border-radius: 999px;
+    letter-spacing: 0.04em; text-transform: uppercase; cursor: help;
+  }
+
+  /* ── tabs ───────────────────────────────────────────────── */
+  .tabs { display: flex; gap: var(--s4); overflow-x: auto; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
   .tabs button {
     appearance: none; border: 0; background: transparent; cursor: pointer;
     font: inherit; font-size: var(--fs-3); color: var(--muted);
-    padding: var(--s3) var(--s3) calc(var(--s3) - 2px);
+    padding: 0 0 var(--s3); margin-bottom: -1px;
     border-bottom: 2px solid transparent; white-space: nowrap;
   }
   .tabs button:hover { color: var(--ink-2); }
   .tabs button[aria-selected="true"] {
-    color: var(--ink); font-weight: 600; border-bottom-color: var(--series-1);
+    color: var(--ink); font-weight: 500; border-bottom-color: var(--ink);
   }
 
-  /* ── toolbar (one row, scoping everything below it) ──────── */
+  /* ── controls ───────────────────────────────────────────── */
   .filters {
     display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center;
     padding: var(--s4) 0;
   }
-  .filters .lbl {
+  .lbl {
     font-size: var(--fs-1); color: var(--muted);
     text-transform: uppercase; letter-spacing: 0.06em;
   }
-  .seg { display: inline-flex; border: 1px solid var(--hairline); border-radius: var(--r-sm); overflow: hidden; background: var(--surface); }
+  .seg {
+    display: inline-flex; padding: 2px; gap: 2px;
+    border: 1px solid var(--line); border-radius: var(--r-1);
+    background: var(--surface-2);
+  }
   .seg button {
     appearance: none; border: 0; background: transparent; color: var(--ink-2);
-    font: inherit; font-size: var(--fs-2); padding: 5px var(--s3); cursor: pointer;
-    border-right: 1px solid var(--hairline);
+    font: inherit; font-size: var(--fs-2); padding: 4px 10px; cursor: pointer;
+    border-radius: var(--r-1);
   }
-  .seg button:last-child { border-right: 0; }
-  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--surface); font-weight: 600; }
-  .seg button:hover:not([aria-pressed="true"]) { background: var(--grid); }
+  .seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); font-weight: 600; }
+  .seg button:hover:not([aria-pressed="true"]) { color: var(--ink); }
   .btn {
-    appearance: none; font: inherit; font-size: var(--fs-2); padding: 5px var(--s3);
-    border: 1px solid var(--hairline); border-radius: var(--r-sm);
+    appearance: none; font: inherit; font-size: var(--fs-2); padding: 5px 11px;
+    border: 1px solid var(--line); border-radius: var(--r-1);
     background: var(--surface); color: var(--ink-2); cursor: pointer;
   }
-  .btn:hover { background: var(--grid); }
-  .btn[aria-pressed="true"] { background: var(--ink); color: var(--surface); font-weight: 600; }
+  .btn:hover { border-color: var(--line-2); color: var(--ink); }
+  .btn[aria-pressed="true"] { background: var(--ink); color: var(--page); border-color: var(--ink); font-weight: 600; }
   label.check {
     display: inline-flex; align-items: center; gap: var(--s2);
     font-size: var(--fs-2); color: var(--ink-2); cursor: pointer;
   }
+  select.sel {
+    appearance: none; font: inherit; font-size: var(--fs-2);
+    padding: 4px 24px 4px 9px; border-radius: var(--r-1);
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink-2);
+    cursor: pointer;
+    background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                      linear-gradient(135deg, currentColor 50%, transparent 50%);
+    background-position: right 11px center, right 6px center;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+  }
+  input.field {
+    font: inherit; font-size: var(--fs-2); padding: 5px 10px;
+    border: 1px solid var(--line); border-radius: var(--r-1);
+    background: var(--surface); color: var(--ink); width: 200px;
+  }
+  input.field::placeholder { color: var(--muted); }
 
-  /* ── cards & grid ───────────────────────────────────────── */
-  /* No drop shadow. Nine shadowed panels stacked read as clutter; a
-     hairline is enough separation when the spacing is honest. */
+  /* ── cards ──────────────────────────────────────────────── */
+  /* No shadows. A hairline is enough separation when spacing is honest,
+     and it keeps every panel on exactly the same visual plane. */
   .card {
-    background: var(--surface); border: 1px solid var(--hairline);
-    border-radius: var(--r-md); padding: var(--s4) var(--s5) var(--s5);
-    margin-bottom: var(--s4);
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--r-2); padding: var(--s4);
+    display: flex; flex-direction: column;
   }
-  .card > h2 {
-    font-size: var(--fs-3); font-weight: 600; margin: 0;
-    letter-spacing: -0.005em; display: flex; align-items: center; gap: var(--s2);
+  .card + .card, .stack > * + * { margin-top: var(--s4); }
+  .card-head {
+    display: flex; align-items: baseline; gap: var(--s2);
+    margin: 0 0 var(--s4);
   }
-  .card > .note {
-    color: var(--muted); font-size: var(--fs-2);
-    margin: var(--s1) 0 var(--s4); max-width: 78ch;
+  .card-head h2 {
+    font-size: var(--fs-4); font-weight: 600; margin: 0;
+    letter-spacing: -0.01em;
   }
+  .card-head .note { color: var(--muted); font-size: var(--fs-2); margin: 0; }
   /* The long "why this metric is defined this way" prose lives behind
-     this, so it is one click away instead of on screen at all times. */
+     this, one hover away instead of on screen at all times. */
   .help {
-    appearance: none; border: 1px solid var(--hairline); background: transparent;
+    appearance: none; border: 1px solid var(--line); background: transparent;
     color: var(--muted); cursor: help; font: inherit; font-size: 10px;
-    width: 16px; height: 16px; border-radius: 999px; padding: 0;
+    width: 15px; height: 15px; border-radius: 999px; padding: 0;
     display: inline-flex; align-items: center; justify-content: center; flex: none;
+    align-self: center;
   }
-  .help:hover { color: var(--ink); border-color: var(--axis); }
-  .cols { display: grid; gap: var(--s4); grid-template-columns: 1fr 1fr; }
-  @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+  .help:hover { color: var(--ink); border-color: var(--line-2); }
+  /* Equal-height columns: the grid stretches, the card fills. */
+  .cols { display: grid; gap: var(--s4); grid-template-columns: 1fr 1fr; align-items: stretch; }
+  .cols > .card { margin-top: 0; height: 100%; }
+  .stack { display: block; }
 
   /* ── KPI strip ──────────────────────────────────────────── */
-  /* Borderless cells divided by hairlines, on a fixed 4-column grid.
-     'auto-fit' used to leave a single orphan tile on its own row. */
+  /* Exactly four, on a fixed 4-column grid, so it is one clean row at
+     every width — never an orphan tile on a second row. */
   .kpis {
     display: grid; grid-template-columns: repeat(4, 1fr);
-    border: 1px solid var(--hairline); border-radius: var(--r-md);
-    background: var(--surface); overflow: hidden;
+    border: 1px solid var(--line); border-radius: var(--r-2);
+    background: var(--surface); overflow: hidden; margin-bottom: var(--s4);
   }
-  .kpi {
-    padding: var(--s3) var(--s4);
-    border-left: 1px solid var(--hairline);
-    border-top: 1px solid var(--hairline);
-  }
-  .kpi:nth-child(4n + 1) { border-left: 0; }
-  .kpi:nth-child(-n + 4) { border-top: 0; }
+  .kpi { padding: var(--s4); border-left: 1px solid var(--line); }
+  .kpi:first-child { border-left: 0; }
   .kpi .k {
     color: var(--muted); font-size: var(--fs-1);
     text-transform: uppercase; letter-spacing: 0.06em;
   }
   .kpi .v {
-    font-size: var(--fs-5); font-weight: 600; line-height: 1.15;
-    margin-top: var(--s1); font-variant-numeric: tabular-nums;
+    font-size: var(--fs-6); font-weight: 600; line-height: 1.1;
+    letter-spacing: -0.025em; margin-top: var(--s2);
+    font-variant-numeric: tabular-nums;
   }
-  .kpi .sub { color: var(--muted); font-size: var(--fs-1); margin-top: 2px; }
-  /* The one figure that gets to be big. */
-  .kpi.lead .v { font-size: var(--fs-6); letter-spacing: -0.02em; }
-  @media (max-width: 900px) {
-    .kpis { grid-template-columns: repeat(2, 1fr); }
-    .kpi:nth-child(4n + 1) { border-left: 1px solid var(--hairline); }
-    .kpi:nth-child(odd) { border-left: 0; }
-    .kpi:nth-child(-n + 4) { border-top: 1px solid var(--hairline); }
-    .kpi:nth-child(-n + 2) { border-top: 0; }
+  .kpi .sub { color: var(--muted); font-size: var(--fs-2); margin-top: var(--s1); }
+
+  /* Secondary figures — same grid, quieter, four per row. */
+  .facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s4) 0; }
+  .fact { padding: 0 var(--s4); border-left: 1px solid var(--line); }
+  .fact:nth-child(4n + 1) { border-left: 0; padding-left: 0; }
+  .fact .k {
+    color: var(--muted); font-size: var(--fs-1);
+    text-transform: uppercase; letter-spacing: 0.06em;
   }
+  .fact .v {
+    font-size: var(--fs-5); font-weight: 600; line-height: 1.2;
+    margin-top: var(--s1); letter-spacing: -0.015em;
+    font-variant-numeric: tabular-nums;
+  }
+  .fact .sub { color: var(--muted); font-size: var(--fs-1); margin-top: 2px; }
 
   /* ── charts ─────────────────────────────────────────────── */
   .chart { width: 100%; }
   .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
   .legend { display: flex; flex-wrap: wrap; gap: var(--s4); margin: 0 0 var(--s3); }
   .legend .item { display: inline-flex; align-items: center; gap: var(--s2); font-size: var(--fs-2); color: var(--ink-2); }
-  .legend .swatch { width: 11px; height: 11px; border-radius: 3px; flex: none; }
+  .legend .swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
   .legend .line-key { width: 14px; height: 2px; border-radius: 2px; flex: none; }
   .hit { fill: transparent; cursor: pointer; }
   .hit:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
 
   /* ── tooltip ────────────────────────────────────────────── */
   #tip {
-    position: fixed; z-index: 40; pointer-events: none; opacity: 0;
+    position: fixed; z-index: 60; pointer-events: none; opacity: 0;
     transition: opacity .09s ease-out;
     background: var(--surface); color: var(--ink);
-    border: 1px solid var(--hairline); border-radius: 9px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.16);
-    padding: 9px 11px; font-size: 12px; min-width: 132px; max-width: 280px;
+    border: 1px solid var(--line-2); border-radius: var(--r-2);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.14);
+    padding: 9px 11px; font-size: var(--fs-2); min-width: 132px; max-width: 280px;
   }
-  #tip .t-head { font-weight: 600; margin-bottom: 6px; font-size: 12px; }
+  #tip .t-head { font-weight: 600; margin-bottom: 6px; }
   #tip .t-row { display: flex; align-items: center; gap: 7px; margin-top: 3px; }
   #tip .t-key { width: 12px; height: 2px; border-radius: 2px; flex: none; }
   #tip .t-val { font-weight: 600; font-variant-numeric: tabular-nums; }
   #tip .t-name { color: var(--ink-2); }
 
-  /* ── tables ─────────────────────────────────────────────── */
-  .table-wrap { overflow-x: auto; margin-top: 4px; }
+  /* ── data table ─────────────────────────────────────────── */
+  .dt { display: flex; flex-direction: column; min-height: 0; }
+  .dt-bar {
+    display: flex; align-items: center; gap: var(--s2);
+    margin-bottom: var(--s3);
+  }
+  .dt-body { overflow-x: auto; }
   table { border-collapse: collapse; width: 100%; font-size: var(--fs-2); }
-  th, td { text-align: right; padding: var(--s2) var(--s3); white-space: nowrap; }
-  th:first-child, td:first-child { text-align: left; }
+  th, td { text-align: right; padding: 7px var(--s3); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; padding-left: 0; }
+  th:last-child, td:last-child { padding-right: 0; }
   thead th {
-    color: var(--ink-2); font-weight: 600; font-size: var(--fs-1);
-    border-bottom: 1px solid var(--axis); position: sticky; top: 0;
-    background: var(--surface);
+    color: var(--muted); font-weight: 500; font-size: var(--fs-1);
+    text-transform: uppercase; letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--line-2);
+    padding-top: 0; padding-bottom: var(--s2);
   }
   thead th.sortable { cursor: pointer; user-select: none; }
   thead th.sortable:hover { color: var(--ink); }
-  tbody tr { border-bottom: 1px solid var(--grid); }
-  tbody tr:hover { background: var(--page); }
+  thead th .caret { color: var(--ink); }
+  tbody tr { border-bottom: 1px solid var(--line); }
+  tbody tr:last-child { border-bottom: 0; }
+  tbody tr:hover { background: var(--surface-2); }
   td.num { font-variant-numeric: tabular-nums; }
   .dim { color: var(--muted); }
   .pill {
     display: inline-block; padding: 1px 7px; border-radius: 999px;
-    font-size: 11px; border: 1px solid var(--hairline); color: var(--ink-2);
+    font-size: var(--fs-1); border: 1px solid var(--line); color: var(--ink-2);
   }
   .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; }
-  .table-twin { display: none; margin-top: 14px; border-top: 1px solid var(--grid); padding-top: 10px; }
-  .show-tables .table-twin { display: block; }
-  .table-twin h3 { font-size: 11.5px; font-weight: 600; color: var(--ink-2); margin: 0 0 6px; }
+
+  /* ── pager ──────────────────────────────────────────────── */
+  .dt-foot {
+    display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap;
+    margin-top: var(--s3); padding-top: var(--s3);
+    border-top: 1px solid var(--line);
+    font-size: var(--fs-2); color: var(--muted);
+  }
+  /* Size select and pager travel together and stay right-aligned, so a
+     footer that wraps in a half-width card still reads as one cluster
+     rather than two stray controls. */
+  .dt-tools { display: flex; align-items: center; gap: var(--s3); margin-left: auto; }
+  .pager { display: inline-flex; align-items: center; gap: 2px; }
+  .pager button {
+    appearance: none; font: inherit; font-size: var(--fs-2);
+    min-width: 28px; height: 28px; padding: 0 7px;
+    border: 1px solid transparent; border-radius: var(--r-1);
+    background: transparent; color: var(--ink-2); cursor: pointer;
+    font-variant-numeric: tabular-nums;
+  }
+  .pager button:hover:not(:disabled):not([aria-current="page"]) {
+    background: var(--surface-2); color: var(--ink);
+  }
+  .pager button[aria-current="page"] {
+    background: var(--ink); color: var(--page); font-weight: 600;
+  }
+  .pager button:disabled { opacity: .35; cursor: default; }
+  .pager .gap { padding: 0 var(--s1); color: var(--muted); }
 
   /* ── heatmap cells ──────────────────────────────────────── */
   .heat { border-collapse: separate; border-spacing: 2px; }
-  .heat td.cell { text-align: center; border-radius: 4px; font-variant-numeric: tabular-nums; padding: 7px 8px; min-width: 46px; }
+  .heat td.cell { text-align: center; border-radius: var(--r-1); font-variant-numeric: tabular-nums; padding: 7px 8px; min-width: 44px; }
   .heat td.na { background: transparent; color: var(--muted); }
-  .heat th { font-weight: 600; font-size: 11px; color: var(--ink-2); }
+  .heat tbody tr { border: 0; }
+  .heat tbody tr:hover { background: transparent; }
+  .heat thead th { border-bottom: 0; }
+
+  /* ── secondary tables (behind the toggle) ───────────────── */
+  .table-twin { display: none; margin-top: var(--s4); border-top: 1px solid var(--line); padding-top: var(--s4); }
+  .show-tables .table-twin { display: block; }
+  .table-twin h3 {
+    font-size: var(--fs-1); font-weight: 500; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 var(--s3);
+  }
 
   /* ── states ─────────────────────────────────────────────── */
   .empty {
-    border: 1px dashed var(--axis); border-radius: 10px; padding: 20px;
-    color: var(--ink-2); font-size: 12.5px; background: var(--page);
+    border: 1px dashed var(--line-2); border-radius: var(--r-2); padding: var(--s4);
+    color: var(--ink-2); font-size: var(--fs-2); background: var(--page);
   }
-  .empty strong { color: var(--ink); }
-  #app.loading { opacity: 0.55; transition: opacity .12s; }
-  .err { color: var(--critical); font-size: 12.5px; }
+  #app.loading { opacity: .5; transition: opacity .12s; }
+  #app { padding-bottom: var(--s6); }
+  .err { color: var(--critical); font-size: var(--fs-2); }
 
   /* ── gate ───────────────────────────────────────────────── */
-  #gate { max-width: 380px; margin: 12vh auto; }
-  #gate form { display: flex; gap: 8px; margin-top: 14px; }
+  #gate { max-width: 360px; margin: 16vh auto; padding: 0 var(--s5); }
+  #gate .mark { margin-bottom: var(--s4); }
+  #gate h2 { font-size: var(--fs-4); font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+  #gate form { display: flex; gap: var(--s2); margin-top: var(--s4); }
   #gate input {
-    flex: 1; font: inherit; padding: 9px 11px; border-radius: 8px;
-    border: 1px solid var(--axis); background: var(--surface); color: var(--ink);
+    flex: 1; font: inherit; font-size: var(--fs-3); padding: 8px 11px;
+    border-radius: var(--r-1); border: 1px solid var(--line-2);
+    background: var(--surface); color: var(--ink);
   }
   #gate button {
-    font: inherit; font-weight: 600; padding: 9px 16px; border-radius: 8px;
-    border: 0; background: var(--ink); color: var(--surface); cursor: pointer;
+    font: inherit; font-size: var(--fs-3); font-weight: 600; padding: 8px 16px;
+    border-radius: var(--r-1); border: 0;
+    background: var(--ink); color: var(--page); cursor: pointer;
   }
-  [hidden] { display: none !important; }
+
+  /* ── narrow ─────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .wrap { padding: 0 var(--s4); }
+    /* The freshness stamp is the first thing to go: wrapped onto three
+       lines it doubles the header height for a detail nobody scans on a
+       phone. Refresh still restates it. */
+    #stamp { display: none; }
+    .tabs { padding-right: var(--s4); }
+    .cols { grid-template-columns: 1fr; }
+    .kpis { grid-template-columns: repeat(2, 1fr); }
+    .kpi:nth-child(odd) { border-left: 0; }
+    .kpi:nth-child(n + 3) { border-top: 1px solid var(--line); }
+    .facts { grid-template-columns: repeat(2, 1fr); }
+    .fact:nth-child(4n + 1) { border-left: 1px solid var(--line); padding-left: var(--s4); }
+    .fact:nth-child(odd) { border-left: 0; padding-left: 0; }
+    input.field { width: 140px; }
+  }
 </style>
 </head>
 <body>
@@ -334,56 +449,63 @@ export const dashboardHtml = String.raw`<!doctype html>
 
 <!-- Token gate. The page ships with no data in it; everything is fetched
      with an X-Admin-Token header after this succeeds. -->
-<section id="gate" class="card" hidden>
-  <h2 style="font-size:15px">Scrolt analytics</h2>
+<section id="gate" hidden>
+  <span class="mark" aria-hidden></span>
+  <h2>Scrolt analytics</h2>
   <p class="subtle" style="margin:6px 0 0">Enter the admin token to continue.</p>
   <form id="gate-form">
     <input id="gate-input" type="password" placeholder="Admin token" autocomplete="current-password" spellcheck="false" required>
     <button type="submit">Open</button>
   </form>
-  <p id="gate-err" class="err" style="margin:10px 0 0" hidden></p>
+  <p id="gate-err" class="err" style="margin:12px 0 0" hidden></p>
 </section>
 
-<div class="wrap" id="shell" hidden>
-  <header class="top">
-    <h1>Scrolt</h1>
-    <span class="chip" title="Every metric counts logged-out visitors too. Anonymous ids (anon_*) are one per browser; signing in merges that history into the account, so &quot;logged out&quot; means still-unconverted.">Analytics</span>
-    <span class="grow"></span>
-    <span class="subtle" id="stamp"></span>
-    <button class="btn" id="theme-toggle" type="button" title="Toggle light / dark">Theme</button>
-    <button class="btn" id="signout" type="button">Lock</button>
-  </header>
-
-  <!-- One tab per question. Only the active tab is built, so a chart is
-       never laid out inside a hidden container at zero width. -->
-  <nav class="tabs" id="tabs" role="tablist" aria-label="Sections"></nav>
-
-  <!-- One toolbar, scoping everything below it. Controls that apply to a
-       single tab (cohort width) are revealed only on that tab. -->
-  <div class="filters" role="group" aria-label="Filters">
-    <span class="lbl">Range</span>
-    <div class="seg" id="range-seg">
-      <button type="button" data-days="7">7d</button>
-      <button type="button" data-days="30">30d</button>
-      <button type="button" data-days="90">90d</button>
-      <button type="button" data-days="365">1y</button>
+<div id="shell" hidden>
+  <div class="topbar">
+    <div class="wrap bar">
+      <span class="mark" aria-hidden></span>
+      <h1>Scrolt</h1>
+      <span class="chip" title="Every metric counts logged-out visitors too. Anonymous ids (anon_*) are one per browser; signing in merges that history into the account, so &quot;logged out&quot; means still-unconverted.">Analytics</span>
+      <span class="grow"></span>
+      <span class="subtle" id="stamp"></span>
+      <button class="btn" id="theme-toggle" type="button" title="Toggle light / dark">Theme</button>
+      <button class="btn" id="signout" type="button">Lock</button>
     </div>
-    <span class="lbl" id="weeks-lbl" hidden>Cohorts</span>
-    <div class="seg" id="weeks-seg" hidden>
-      <button type="button" data-weeks="4">4w</button>
-      <button type="button" data-weeks="8">8w</button>
-      <button type="button" data-weeks="16">16w</button>
+    <!-- One tab per question. Only the active tab is built, so a chart is
+         never laid out inside a hidden container at zero width. -->
+    <div class="wrap">
+      <nav class="tabs" id="tabs" role="tablist" aria-label="Sections"></nav>
     </div>
-    <span class="grow"></span>
-    <label class="check">
-      <input type="checkbox" id="only-authed"> Signed-in only
-    </label>
-    <button class="btn" id="tables-toggle" type="button" aria-pressed="false">Data tables</button>
-    <button class="btn" id="refresh" type="button">Refresh</button>
   </div>
 
-  <div id="app"></div>
-  <p id="app-err" class="err" hidden></p>
+  <div class="wrap">
+    <!-- One toolbar, scoping everything below it. Controls that apply to a
+         single tab (cohort width) are revealed only on that tab. -->
+    <div class="filters" role="group" aria-label="Filters">
+      <span class="lbl">Range</span>
+      <div class="seg" id="range-seg">
+        <button type="button" data-days="7">7d</button>
+        <button type="button" data-days="30">30d</button>
+        <button type="button" data-days="90">90d</button>
+        <button type="button" data-days="365">1y</button>
+      </div>
+      <span class="lbl" id="weeks-lbl" hidden>Cohorts</span>
+      <div class="seg" id="weeks-seg" hidden>
+        <button type="button" data-weeks="4">4w</button>
+        <button type="button" data-weeks="8">8w</button>
+        <button type="button" data-weeks="16">16w</button>
+      </div>
+      <span class="grow"></span>
+      <label class="check">
+        <input type="checkbox" id="only-authed"> Signed-in only
+      </label>
+      <button class="btn" id="tables-toggle" type="button" aria-pressed="false">Data tables</button>
+      <button class="btn" id="refresh" type="button">Refresh</button>
+    </div>
+
+    <div id="app"></div>
+    <p id="app-err" class="err" hidden></p>
+  </div>
 </div>
 
 <script>
@@ -400,6 +522,11 @@ export const dashboardHtml = String.raw`<!doctype html>
   // A bare relative "api/x" would NOT work: from /admin it resolves to
   // /api/x, silently dropping the mount point.
   var API_BASE = window.location.pathname.replace(/\/+$/, "") + "/api/";
+
+  // How much the one batched request pulls down. Tables page through
+  // this client-side, which is why the ceilings are generous: paging
+  // must never be a window onto a truncated set the operator can't see.
+  var FETCH = { users: 500, events: 500, cards: 100 };
 
   var state = {
     token: null,
@@ -558,7 +685,7 @@ export const dashboardHtml = String.raw`<!doctype html>
   }
 
   var GAP = 2;          // surface gap between touching marks
-  var MAX_BAR = 24;     // bar/column thickness cap
+  var MAX_BAR = 22;     // bar/column thickness cap
 
   /**
    * Stacked columns over time. Two series (signed-in / logged-out) share
@@ -568,7 +695,7 @@ export const dashboardHtml = String.raw`<!doctype html>
   function renderStackedColumns(host, points, series, opts) {
     opts = opts || {};
     var W = Math.max(320, host.clientWidth || 640);
-    var padL = 44, padR = 14, padT = 16, padB = 30;
+    var padL = 44, padR = 12, padT = 18, padB = 28;
     var H = opts.height || 220;
     var plotW = W - padL - padR;
     var plotH = H - padT - padB;
@@ -578,7 +705,7 @@ export const dashboardHtml = String.raw`<!doctype html>
     });
     var max = niceMax(Math.max.apply(null, totals.concat([1])));
     var band = plotW / Math.max(1, points.length);
-    var barW = Math.min(MAX_BAR, Math.max(2, band - Math.max(2, band * 0.3)));
+    var barW = Math.min(MAX_BAR, Math.max(2, band - Math.max(2, band * 0.32)));
 
     var root = svg("svg", {
       viewBox: "0 0 " + W + " " + H,
@@ -586,7 +713,6 @@ export const dashboardHtml = String.raw`<!doctype html>
       role: "img",
       "aria-label": opts.ariaLabel || "Time series"
     });
-    var surface = cssVar("--surface");
 
     // Gridlines + y ticks: solid hairlines, one step off the surface.
     var ticks = 4;
@@ -599,8 +725,8 @@ export const dashboardHtml = String.raw`<!doctype html>
         "stroke-width": 1
       }));
       var lbl = svg("text", {
-        x: padL - 8, y: gy + 3.5, "text-anchor": "end",
-        fill: cssVar("--muted"), "font-size": 11.5,
+        x: padL - 10, y: gy + 3.5, "text-anchor": "end",
+        fill: cssVar("--muted"), "font-size": 11,
         style: "font-variant-numeric:tabular-nums"
       });
       lbl.textContent = fmt(Math.round(val));
@@ -639,7 +765,7 @@ export const dashboardHtml = String.raw`<!doctype html>
         var capY = padT + plotH - (totals[i] / max) * plotH;
         var dl = svg("text", {
           x: cx + barW / 2, y: Math.max(padT - 4, capY - 7), "text-anchor": "middle",
-          fill: cssVar("--ink"), "font-size": 12, "font-weight": 600
+          fill: cssVar("--ink"), "font-size": 11.5, "font-weight": 600
         });
         dl.textContent = fmt(totals[i]);
         root.appendChild(dl);
@@ -673,8 +799,8 @@ export const dashboardHtml = String.raw`<!doctype html>
       if (xi % every !== 0 && xi !== points.length - 1) continue;
       if (xi !== points.length - 1 && points.length - 1 - xi < every * 0.6) continue;
       var xt = svg("text", {
-        x: padL + band * xi + band / 2, y: H - 10, "text-anchor": "middle",
-        fill: cssVar("--muted"), "font-size": 11.5
+        x: padL + band * xi + band / 2, y: H - 9, "text-anchor": "middle",
+        fill: cssVar("--muted"), "font-size": 11
       });
       xt.textContent = shortDay(points[xi].day);
       root.appendChild(xt);
@@ -689,8 +815,8 @@ export const dashboardHtml = String.raw`<!doctype html>
     opts = opts || {};
     var W = Math.max(320, host.clientWidth || 640);
     // Percent ticks ("100%") need more gutter than bare counts.
-    var padL = opts.suffix ? 48 : 40;
-    var padR = 14, padT = 20, padB = 34;
+    var padL = opts.suffix ? 46 : 40;
+    var padR = 12, padT = 20, padB = 34;
     var H = opts.height || 210;
     var plotW = W - padL - padR;
     var plotH = H - padT - padB;
@@ -709,7 +835,7 @@ export const dashboardHtml = String.raw`<!doctype html>
       opts.minMax || 1
     );
     var band = plotW / Math.max(1, groups.length);
-    var inner = Math.min(MAX_BAR, Math.max(4, (band * 0.62) / series.length - GAP));
+    var inner = Math.min(MAX_BAR, Math.max(4, (band * 0.6) / series.length - GAP));
 
     var root = svg("svg", {
       viewBox: "0 0 " + W + " " + H, width: W, height: H,
@@ -725,8 +851,8 @@ export const dashboardHtml = String.raw`<!doctype html>
         stroke: t === 0 ? cssVar("--axis") : cssVar("--grid"), "stroke-width": 1
       }));
       var lb = svg("text", {
-        x: padL - 8, y: gy + 3.5, "text-anchor": "end",
-        fill: cssVar("--muted"), "font-size": 11.5
+        x: padL - 10, y: gy + 3.5, "text-anchor": "end",
+        fill: cssVar("--muted"), "font-size": 11
       });
       lb.textContent = Math.round(val) + (opts.suffix || "");
       root.appendChild(lb);
@@ -747,7 +873,7 @@ export const dashboardHtml = String.raw`<!doctype html>
         if (opts.labelLast && i === groups.length - 1) {
           var vt = svg("text", {
             x: x + inner / 2, y: Math.max(padT - 5, y - 6), "text-anchor": "middle",
-            fill: cssVar("--ink"), "font-size": 11.5, "font-weight": 600
+            fill: cssVar("--ink"), "font-size": 11, "font-weight": 600
           });
           vt.textContent = Math.round(v) + (opts.suffix || "");
           root.appendChild(vt);
@@ -767,14 +893,14 @@ export const dashboardHtml = String.raw`<!doctype html>
 
       var xt = svg("text", {
         x: padL + band * i + band / 2, y: H - 12, "text-anchor": "middle",
-        fill: cssVar("--ink-2"), "font-size": 12
+        fill: cssVar("--ink-2"), "font-size": 11.5
       });
       xt.textContent = g.label;
       root.appendChild(xt);
       if (g.sublabel) {
         var st = svg("text", {
           x: padL + band * i + band / 2, y: H - 1, "text-anchor": "middle",
-          fill: cssVar("--muted"), "font-size": 12
+          fill: cssVar("--muted"), "font-size": 11
         });
         st.textContent = g.sublabel;
         root.appendChild(st);
@@ -824,7 +950,7 @@ export const dashboardHtml = String.raw`<!doctype html>
       // Value at the tip, outside the bar — never clipped inside it.
       var vt = svg("text", {
         x: labelW + Math.max(w, 0) + 8, y: y + barH / 2 + 4,
-        fill: cssVar("--ink"), "font-size": 11.5, "font-weight": 600,
+        fill: cssVar("--ink"), "font-size": 11, "font-weight": 600,
         style: "font-variant-numeric:tabular-nums"
       });
       vt.textContent = r.display !== undefined ? r.display : fmt(r.value);
@@ -841,25 +967,28 @@ export const dashboardHtml = String.raw`<!doctype html>
     host.appendChild(root);
   }
 
-  // ── sections ──────────────────────────────────────────────
+  // ── card shell ────────────────────────────────────────────
   /**
-   * 'note' is the one-line orientation that earns its place on screen.
-   * 'help' is the long definitional prose — it hangs off a hover/focus
-   * affordance instead, because nine paragraphs of it stacked down the
-   * page was the single biggest source of visual noise.
+   * 'note' is the one-line orientation that earns its place on screen —
+   * it sits on the title baseline rather than below it, so a card head is
+   * always exactly one line tall. 'help' is the long definitional prose;
+   * it hangs off a hover/focus affordance instead, because nine
+   * paragraphs of it stacked down the page was the single biggest source
+   * of visual noise.
    */
   function card(title, note, help) {
     var c = el("div", "card");
-    var h = el("h2", null, title);
+    var head = el("div", "card-head");
+    head.appendChild(el("h2", null, title));
     if (help) {
       var q = el("button", "help", "i");
       q.type = "button";
       q.title = help;
       q.setAttribute("aria-label", title + " — " + help);
-      h.appendChild(q);
+      head.appendChild(q);
     }
-    c.appendChild(h);
-    if (note) c.appendChild(el("p", "note", note));
+    if (note) head.appendChild(el("p", "note", note));
+    c.appendChild(head);
     return c;
   }
 
@@ -876,46 +1005,6 @@ export const dashboardHtml = String.raw`<!doctype html>
     return l;
   }
 
-  function table(columns, rows, opts) {
-    opts = opts || {};
-    var wrap = el("div", "table-wrap");
-    var t = el("table");
-    if (opts.cls) t.className = opts.cls;
-    var thead = el("thead");
-    var htr = el("tr");
-    columns.forEach(function (c) {
-      var th = el("th", c.sortable ? "sortable" : null, c.label);
-      if (c.title) th.title = c.title;
-      if (c.sortable) {
-        th.addEventListener("click", function () { opts.onSort(c.key); });
-        if (opts.sortKey === c.key) th.textContent = c.label + (opts.sortDesc ? " ↓" : " ↑");
-      }
-      htr.appendChild(th);
-    });
-    thead.appendChild(htr);
-    t.appendChild(thead);
-    var tb = el("tbody");
-    rows.forEach(function (r) {
-      var tr = el("tr");
-      columns.forEach(function (c) {
-        var td = el("td", c.num ? "num" : null);
-        var v = c.render ? c.render(r) : r[c.key];
-        if (v instanceof Node) td.appendChild(v);
-        else td.textContent = (v === null || v === undefined || v === "") ? "—" : String(v);
-        if (c.cls) td.className = (td.className ? td.className + " " : "") + c.cls;
-        tr.appendChild(td);
-      });
-      tb.appendChild(tr);
-    });
-    t.appendChild(tb);
-    wrap.appendChild(t);
-    if (!rows.length) {
-      var e = el("p", "subtle", opts.emptyText || "No data yet.");
-      wrap.appendChild(e);
-    }
-    return wrap;
-  }
-
   function twin(title, node) {
     var d = el("div", "table-twin");
     d.appendChild(el("h3", null, title));
@@ -923,49 +1012,319 @@ export const dashboardHtml = String.raw`<!doctype html>
     return d;
   }
 
+  // ── the one table component ───────────────────────────────
+  /**
+   * Every table on this page is this function. It owns search, sort,
+   * page size and paging, and it repaints only its own subtree — so
+   * changing a page never rebuilds a chart or moves the scroll position.
+   *
+   * Per-table UI state is keyed by id in a module-level map so it
+   * survives a data refresh: refreshing on page 4 of People leaves you
+   * on page 4. The page is clamped on every paint, so a refresh that
+   * returns fewer rows lands on the last real page instead of an empty
+   * one.
+   *
+   * Paging is client-side over one batched fetch (see FETCH). The footer
+   * always states the true total it is paging over, and says so plainly
+   * when the server-side ceiling truncated the set — a pager that hides
+   * a truncation is worse than no pager.
+   */
+  var PAGE_SIZES = [10, 25, 50, 100];
+  var tableUi = {};
+
+  function tableState(id, opts) {
+    if (!tableUi[id]) {
+      tableUi[id] = {
+        page: 1,
+        size: opts.pageSize || 25,
+        q: "",
+        sortKey: opts.sortKey || null,
+        sortDesc: opts.sortDesc !== false
+      };
+    }
+    return tableUi[id];
+  }
+
+  /** Page numbers to render, with gaps: 1 … 4 5 6 … 20. */
+  function pageList(cur, total) {
+    if (total <= 7) {
+      var all = [];
+      for (var i = 1; i <= total; i++) all.push(i);
+      return all;
+    }
+    var out = [1];
+    var from = Math.max(2, cur - 1);
+    var to = Math.min(total - 1, cur + 1);
+    if (from > 2) out.push("gap");
+    for (var p = from; p <= to; p++) out.push(p);
+    if (to < total - 1) out.push("gap");
+    out.push(total);
+    return out;
+  }
+
+  function compare(a, b, key, desc) {
+    var av = a[key], bv = b[key];
+    if (av === null || av === undefined) av = desc ? -Infinity : Infinity;
+    if (bv === null || bv === undefined) bv = desc ? -Infinity : Infinity;
+    if (typeof av === "string" || typeof bv === "string") {
+      av = String(av); bv = String(bv);
+      return desc ? (av < bv ? 1 : av > bv ? -1 : 0) : (av > bv ? 1 : av < bv ? -1 : 0);
+    }
+    if (typeof av === "boolean") av = av ? 1 : 0;
+    if (typeof bv === "boolean") bv = bv ? 1 : 0;
+    return desc ? bv - av : av - bv;
+  }
+
+  function dataTable(id, columns, rows, opts) {
+    opts = opts || {};
+    var st = tableState(id, opts);
+    var host = el("div", "dt");
+
+    var bar = null;
+    var search = null;
+    if (opts.search) {
+      bar = el("div", "dt-bar");
+      search = el("input", "field");
+      search.type = "search";
+      search.placeholder = opts.searchPlaceholder || "Search";
+      search.value = st.q;
+      search.setAttribute("aria-label", opts.searchPlaceholder || "Search rows");
+      search.addEventListener("input", function () {
+        st.q = search.value;
+        st.page = 1;
+        paint();
+      });
+      bar.appendChild(search);
+      bar.appendChild(el("span", "grow"));
+      if (opts.actions) opts.actions.forEach(function (a) { bar.appendChild(a); });
+      host.appendChild(bar);
+    }
+
+    var body = el("div", "dt-body");
+    var foot = el("div", "dt-foot");
+    host.appendChild(body);
+    host.appendChild(foot);
+
+    function matches(r) {
+      if (!st.q) return true;
+      var needle = st.q.toLowerCase();
+      var keys = opts.searchKeys || columns.map(function (c) { return c.key; });
+      for (var i = 0; i < keys.length; i++) {
+        var v = r[keys[i]];
+        if (v === null || v === undefined) continue;
+        if (String(v).toLowerCase().indexOf(needle) !== -1) return true;
+      }
+      return false;
+    }
+
+    function paint() {
+      var view = rows.filter(matches);
+      if (st.sortKey) {
+        view = view.slice().sort(function (a, b) { return compare(a, b, st.sortKey, st.sortDesc); });
+      }
+
+      var total = view.length;
+      var size = st.size > 0 ? st.size : Math.max(total, 1);
+      var pages = Math.max(1, Math.ceil(total / size));
+      if (st.page > pages) st.page = pages;
+      if (st.page < 1) st.page = 1;
+      var start = (st.page - 1) * size;
+      var slice = view.slice(start, start + size);
+
+      // ── table ──
+      clear(body);
+      var t = el("table");
+      if (opts.cls) t.className = opts.cls;
+
+      var thead = el("thead");
+      var htr = el("tr");
+      columns.forEach(function (c) {
+        var th = el("th", c.sortable ? "sortable" : null);
+        th.appendChild(document.createTextNode(c.label));
+        if (c.title) th.title = c.title;
+        if (c.sortable) {
+          th.setAttribute("role", "button");
+          th.setAttribute("tabindex", "0");
+          if (st.sortKey === c.key) {
+            th.appendChild(el("span", "caret", st.sortDesc ? " ↓" : " ↑"));
+            th.setAttribute("aria-sort", st.sortDesc ? "descending" : "ascending");
+          }
+          var flip = function () {
+            if (st.sortKey === c.key) st.sortDesc = !st.sortDesc;
+            else { st.sortKey = c.key; st.sortDesc = true; }
+            st.page = 1;
+            paint();
+          };
+          th.addEventListener("click", flip);
+          th.addEventListener("keydown", function (ev) {
+            if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); flip(); }
+          });
+        }
+        htr.appendChild(th);
+      });
+      thead.appendChild(htr);
+      t.appendChild(thead);
+
+      var tb = el("tbody");
+      slice.forEach(function (r) {
+        var tr = el("tr");
+        columns.forEach(function (c) {
+          var td = el("td", c.num ? "num" : null);
+          var v = c.render ? c.render(r) : r[c.key];
+          if (v instanceof Node) td.appendChild(v);
+          else td.textContent = (v === null || v === undefined || v === "") ? "—" : String(v);
+          if (c.cls) td.className = (td.className ? td.className + " " : "") + c.cls;
+          tr.appendChild(td);
+        });
+        tb.appendChild(tr);
+      });
+      t.appendChild(tb);
+      body.appendChild(t);
+
+      if (!slice.length) {
+        var empty = el("div", "empty");
+        empty.style.marginTop = "12px";
+        empty.textContent = st.q
+          ? "Nothing matches " + JSON.stringify(st.q) + "."
+          : (opts.emptyText || "No data yet.");
+        body.appendChild(empty);
+      }
+
+      // ── footer ──
+      clear(foot);
+      if (!total) {
+        foot.hidden = true;
+        return;
+      }
+      foot.hidden = false;
+
+      var shownFrom = start + 1;
+      var shownTo = Math.min(start + size, total);
+      var count = el("span", "num");
+      count.textContent = "Showing " + fmt(shownFrom) + "–" + fmt(shownTo) + " of " + fmt(total) +
+        (opts.unit ? " " + opts.unit : "") +
+        (st.q && total !== rows.length ? " (filtered from " + fmt(rows.length) + ")" : "");
+      foot.appendChild(count);
+
+      // Be explicit when the server ceiling cut the set off — otherwise
+      // "of 500" reads as "that's everyone".
+      if (opts.truncatedAt && rows.length >= opts.truncatedAt) {
+        var trunc = el("span");
+        trunc.textContent = "· capped at " + fmt(opts.truncatedAt);
+        trunc.title = "The API returns at most " + opts.truncatedAt +
+          " rows for this table. Narrow the range or export the CSV to see more.";
+        foot.appendChild(trunc);
+      }
+
+      // A table that fits on one page at the smallest page size has
+      // nothing to page through — it gets a row count and no controls.
+      if (pages === 1 && total <= PAGE_SIZES[0]) return;
+
+      var tools = el("div", "dt-tools");
+      foot.appendChild(tools);
+
+      var sizeSel = el("select", "sel");
+      sizeSel.setAttribute("aria-label", "Rows per page");
+      PAGE_SIZES.forEach(function (n) {
+        var o = el("option", null, n + " / page");
+        o.value = String(n);
+        if (st.size === n) o.selected = true;
+        sizeSel.appendChild(o);
+      });
+      var allOpt = el("option", null, "All");
+      allOpt.value = "0";
+      if (st.size === 0) allOpt.selected = true;
+      sizeSel.appendChild(allOpt);
+      sizeSel.addEventListener("change", function () {
+        st.size = Number(sizeSel.value);
+        st.page = 1;
+        paint();
+      });
+      tools.appendChild(sizeSel);
+
+      if (pages > 1) {
+        var pager = el("div", "pager");
+        pager.setAttribute("role", "navigation");
+        pager.setAttribute("aria-label", "Pagination");
+
+        function pageBtn(label, target, current, disabled) {
+          var b = el("button", null, label);
+          b.type = "button";
+          if (disabled) b.disabled = true;
+          if (current) b.setAttribute("aria-current", "page");
+          else b.setAttribute("aria-label", "Page " + target);
+          b.addEventListener("click", function () {
+            if (st.page === target) return;
+            st.page = target;
+            paint();
+          });
+          return b;
+        }
+
+        pager.appendChild(pageBtn("‹", st.page - 1, false, st.page <= 1));
+        pageList(st.page, pages).forEach(function (p) {
+          if (p === "gap") pager.appendChild(el("span", "gap", "…"));
+          else pager.appendChild(pageBtn(String(p), p, p === st.page, false));
+        });
+        pager.appendChild(pageBtn("›", st.page + 1, false, st.page >= pages));
+        tools.appendChild(pager);
+      }
+    }
+
+    paint();
+    return host;
+  }
+
   /** Registered chart re-draw callbacks, replayed on resize. */
   var redraws = [];
 
+  // ── sections ──────────────────────────────────────────────
   /**
-   * The KPI strip. Twelve numbers on a fixed 4-column grid: the lead
-   * figure, three supporting rates, then the all-time totals. Replaces a
-   * 52px hero plus eight individually-bordered tiles that wrapped to an
-   * orphan row at every common window width.
+   * Four pinned KPIs, always above the active tab, because "how many
+   * people are here" is context for every question on the page. The
+   * other eight figures moved to the Overview tab — a permanent
+   * twelve-number wall was most of why this read as cluttered.
    */
-  function sectionHeadline(d) {
+  function sectionKpis(d) {
     var o = d.overview.totals;
-    var wrap = el("div");
-
     var grid = el("div", "kpis");
-    function kpi(k, v, sub, lead) {
-      var t = el("div", "kpi" + (lead ? " lead" : ""));
+    function kpi(k, v, sub) {
+      var t = el("div", "kpi");
       t.appendChild(el("div", "k", k));
       t.appendChild(el("div", "v", v));
       t.appendChild(el("div", "sub", sub || ""));
       return t;
     }
-
-    grid.appendChild(kpi("Active · 7 days", fmt(o.wau),
-      fmt(o.dau) + " today", true));
+    grid.appendChild(kpi("Active · 7 days", fmt(o.wau), fmt(o.dau) + " today"));
     grid.appendChild(kpi("Active · 30 days", fmt(o.mau),
       fmt(o.mauAuthed) + " signed in · " + fmt(o.mauAnon) + " logged out"));
-    grid.appendChild(kpi("Stickiness",
-      o.stickiness === null ? "—" : pctStr(o.stickiness), "DAU / MAU"));
+    grid.appendChild(kpi("Stickiness", o.stickiness === null ? "—" : pctStr(o.stickiness), "DAU / MAU"));
     grid.appendChild(kpi("Sign-up rate", pctStr(o.signupRate), "of everyone seen"));
+    return grid;
+  }
 
-    grid.appendChild(kpi("Accounts", fmt(o.totalAccounts), "all time"));
-    grid.appendChild(kpi("People seen", fmt(o.everActive),
-      fmt(o.everActiveAnon) + " never signed in"));
-    grid.appendChild(kpi("Answers", fmt(o.answersAllTime), "first tries"));
-    grid.appendChild(kpi("Accuracy", pctStr(o.accuracyAllTime), "first try correct"));
-
-    grid.appendChild(kpi("Catalogue", fmt(o.totalCards), "cards live"));
-    grid.appendChild(kpi("Daily challenge", fmt(o.dailyCompletions), "completions"));
-    grid.appendChild(kpi("Friendships", fmt(o.friendships), "mutual pairs"));
-    grid.appendChild(kpi("Events kept", fmt(d.retentionDays) + "d", "then pruned"));
-
-    wrap.appendChild(grid);
-    return wrap;
+  function sectionTotals(d) {
+    var o = d.overview.totals;
+    var c = card("All time", "Cumulative, ignoring the range above.",
+      "These eight are lifetime totals from the tables themselves, not the event stream, so they are unaffected by the retention window.");
+    var grid = el("div", "facts");
+    function fact(k, v, sub) {
+      var t = el("div", "fact");
+      t.appendChild(el("div", "k", k));
+      t.appendChild(el("div", "v", v));
+      t.appendChild(el("div", "sub", sub || ""));
+      return t;
+    }
+    grid.appendChild(fact("Accounts", fmt(o.totalAccounts), "registered"));
+    grid.appendChild(fact("People seen", fmt(o.everActive), fmt(o.everActiveAnon) + " never signed in"));
+    grid.appendChild(fact("Answers", fmt(o.answersAllTime), "first tries"));
+    grid.appendChild(fact("Accuracy", pctStr(o.accuracyAllTime), "first try correct"));
+    grid.appendChild(fact("Catalogue", fmt(o.totalCards), "cards live"));
+    grid.appendChild(fact("Daily challenge", fmt(o.dailyCompletions), "completions"));
+    grid.appendChild(fact("Friendships", fmt(o.friendships), "mutual pairs"));
+    grid.appendChild(fact("Events kept", fmt(d.retentionDays) + "d", "then pruned"));
+    c.appendChild(grid);
+    return c;
   }
 
   function sectionActivity(d) {
@@ -997,17 +1356,17 @@ export const dashboardHtml = String.raw`<!doctype html>
     draw();
     redraws.push(draw);
 
-    c.appendChild(twin("Daily detail", table([
-      { key: "day", label: "Day", render: function (r) { return shortDay(r.day); } },
-      { key: "activeAuthed", label: "Signed in", num: true },
-      { key: "activeAnon", label: "Logged out", num: true },
-      { key: "activeAll", label: "Total", num: true },
-      { key: "newCards", label: "New cards", num: true },
-      { key: "answerEvents", label: "All answers", num: true },
-      { key: "sessions", label: "Sessions", num: true },
-      { key: "signups", label: "Sign-ups", num: true },
-      { key: "dailyChallenges", label: "Daily", num: true }
-    ], pts.slice().reverse())));
+    c.appendChild(twin("Daily detail", dataTable("daily", [
+      { key: "day", label: "Day", sortable: true, render: function (r) { return shortDay(r.day); } },
+      { key: "activeAuthed", label: "Signed in", num: true, sortable: true },
+      { key: "activeAnon", label: "Logged out", num: true, sortable: true },
+      { key: "activeAll", label: "Total", num: true, sortable: true },
+      { key: "newCards", label: "New cards", num: true, sortable: true },
+      { key: "answerEvents", label: "All answers", num: true, sortable: true },
+      { key: "sessions", label: "Sessions", num: true, sortable: true },
+      { key: "signups", label: "Sign-ups", num: true, sortable: true },
+      { key: "dailyChallenges", label: "Daily", num: true, sortable: true }
+    ], pts, { pageSize: 10, sortKey: "day", sortDesc: true, unit: "days" })));
     return c;
   }
 
@@ -1082,23 +1441,23 @@ export const dashboardHtml = String.raw`<!doctype html>
     redraws.push(draw);
 
     var nd = el("p", "subtle");
-    nd.style.marginTop = "10px";
+    nd.style.marginTop = "12px";
     nd.textContent = "Next-day return (active the very next day): " +
       (r.nextDayReturn === null ? "not measurable yet" : pctStr(r.nextDayReturn));
     c.appendChild(nd);
 
-    c.appendChild(twin("Return rates", table([
+    c.appendChild(twin("Return rates", dataTable("returns", [
       { key: "label", label: "Milestone" },
-      { key: "eligible", label: "Eligible", num: true, render: function (x) { return fmt(x.eligible); } },
-      { key: "all", label: "Everyone", num: true, render: function (x) { return pctStr(x.all); } },
-      { key: "authed", label: "Signed in", num: true, render: function (x) { return pctStr(x.authed); } },
-      { key: "anon", label: "Logged out", num: true, render: function (x) { return pctStr(x.anon); } }
+      { key: "eligible", label: "Eligible", num: true, sortable: true, render: function (x) { return fmt(x.eligible); } },
+      { key: "all", label: "Everyone", num: true, sortable: true, render: function (x) { return pctStr(x.all); } },
+      { key: "authed", label: "Signed in", num: true, sortable: true, render: function (x) { return pctStr(x.authed); } },
+      { key: "anon", label: "Logged out", num: true, sortable: true, render: function (x) { return pctStr(x.anon); } }
     ], r.returnedByDay.map(function (m) {
       return {
         label: "Day " + m.day, eligible: m.eligible,
         all: m.all, authed: m.authed, anon: m.anon
       };
-    }))));
+    }), { pageSize: 10, unit: "milestones" })));
     return c;
   }
 
@@ -1112,73 +1471,117 @@ export const dashboardHtml = String.raw`<!doctype html>
       return c;
     }
 
+    // The heatmap is a positional grid, not a row list — its cells only
+    // mean anything read against their neighbours, so it pages by hand
+    // rather than through dataTable.
     var maxW = Math.min(r.maxWeekOffset, 12);
-    var cols = [{ key: "cohort", label: "Cohort week" }, { key: "size", label: "Users", num: true }];
-    for (var w = 1; w <= maxW; w++) {
-      cols.push({ key: "w" + w, label: "W" + w, num: true });
+    var COHORT_PAGE = 12;
+    var st = tableUi.cohorts || (tableUi.cohorts = { page: 1 });
+    var pages = Math.max(1, Math.ceil(r.cohorts.length / COHORT_PAGE));
+    if (st.page > pages) st.page = pages;
+
+    var holder = el("div");
+    c.appendChild(holder);
+
+    function paint() {
+      clear(holder);
+      var start = (st.page - 1) * COHORT_PAGE;
+      var slice = r.cohorts.slice(start, start + COHORT_PAGE);
+
+      var t = el("table", "heat");
+      var thead = el("thead");
+      var htr = el("tr");
+      htr.appendChild(el("th", null, "Cohort week"));
+      htr.appendChild(el("th", null, "Users"));
+      for (var w = 1; w <= maxW; w++) htr.appendChild(el("th", null, "W" + w));
+      thead.appendChild(htr);
+      t.appendChild(thead);
+
+      var tb = el("tbody");
+      slice.forEach(function (row) {
+        var tr = el("tr");
+        tr.appendChild(el("td", null, shortDay(row.cohort)));
+        tr.appendChild(el("td", "num", fmt(row.size)));
+        for (var wi = 1; wi <= maxW; wi++) {
+          var v = row.weeks[wi];
+          var td;
+          if (v === null || v === undefined || !row.size) {
+            tr.appendChild(el("td", "cell na", ""));
+            continue;
+          }
+          var share = v / row.size;
+          td = el("td", "cell");
+          // Sequential single-hue ramp, light -> dark with magnitude. Ink
+          // flips to white on the darker half so it always clears contrast.
+          var step = share <= 0.001 ? null
+            : share < 0.15 ? "--seq-100"
+            : share < 0.3 ? "--seq-250"
+            : share < 0.5 ? "--seq-400"
+            : share < 0.75 ? "--seq-550" : "--seq-700";
+          if (step) {
+            td.style.background = cssVar(step);
+            td.style.color = (step === "--seq-100" || step === "--seq-250")
+              ? "#0b0b0b" : "#ffffff";
+          } else {
+            td.className = "cell na";
+          }
+          td.textContent = Math.round(share * 100) + "%";
+          td.title = fmt(v) + " of " + fmt(row.size) + " users";
+          tr.appendChild(td);
+        }
+        tb.appendChild(tr);
+      });
+      t.appendChild(tb);
+
+      var wrap = el("div", "dt-body");
+      wrap.appendChild(t);
+      holder.appendChild(wrap);
+
+      var foot = el("div", "dt-foot");
+      var count = el("span", "num");
+      count.textContent = "Showing " + fmt(start + 1) + "–" +
+        fmt(Math.min(start + COHORT_PAGE, r.cohorts.length)) + " of " +
+        fmt(r.cohorts.length) + " cohorts";
+      foot.appendChild(count);
+      var tools = el("div", "dt-tools");
+      foot.appendChild(tools);
+
+      var scale = el("div", "legend");
+      scale.style.margin = "0";
+      [["--seq-100", "<15%"], ["--seq-250", "15–30%"], ["--seq-400", "30–50%"],
+       ["--seq-550", "50–75%"], ["--seq-700", "75%+"]].forEach(function (pair) {
+        var i = el("span", "item");
+        var sw = el("span", "swatch");
+        sw.style.background = cssVar(pair[0]);
+        i.appendChild(sw);
+        i.appendChild(document.createTextNode(pair[1]));
+        scale.appendChild(i);
+      });
+      tools.appendChild(scale);
+
+      if (pages > 1) {
+        var pager = el("div", "pager");
+        pager.setAttribute("aria-label", "Pagination");
+        function btn(label, target, current, disabled) {
+          var b = el("button", null, label);
+          b.type = "button";
+          if (disabled) b.disabled = true;
+          if (current) b.setAttribute("aria-current", "page");
+          b.addEventListener("click", function () { st.page = target; paint(); });
+          return b;
+        }
+        pager.appendChild(btn("‹", st.page - 1, false, st.page <= 1));
+        pageList(st.page, pages).forEach(function (p) {
+          if (p === "gap") pager.appendChild(el("span", "gap", "…"));
+          else pager.appendChild(btn(String(p), p, p === st.page, false));
+        });
+        pager.appendChild(btn("›", st.page + 1, false, st.page >= pages));
+        tools.appendChild(pager);
+      }
+      holder.appendChild(foot);
     }
 
-    var t = el("table", "heat");
-    var thead = el("thead");
-    var htr = el("tr");
-    cols.forEach(function (col) { htr.appendChild(el("th", null, col.label)); });
-    thead.appendChild(htr);
-    t.appendChild(thead);
-
-    var tb = el("tbody");
-    r.cohorts.forEach(function (row) {
-      var tr = el("tr");
-      tr.appendChild(el("td", null, shortDay(row.cohort)));
-      var sz = el("td", "num", fmt(row.size));
-      tr.appendChild(sz);
-      for (var wi = 1; wi <= maxW; wi++) {
-        var v = row.weeks[wi];
-        var td;
-        if (v === null || v === undefined || !row.size) {
-          td = el("td", "cell na", "");
-          tr.appendChild(td);
-          continue;
-        }
-        var share = v / row.size;
-        td = el("td", "cell");
-        // Sequential single-hue ramp, light -> dark with magnitude. Ink
-        // flips to white on the darker half so it always clears contrast.
-        var step = share <= 0.001 ? null
-          : share < 0.15 ? "--seq-100"
-          : share < 0.3 ? "--seq-250"
-          : share < 0.5 ? "--seq-400"
-          : share < 0.75 ? "--seq-550" : "--seq-700";
-        if (step) {
-          td.style.background = cssVar(step);
-          td.style.color = (step === "--seq-100" || step === "--seq-250")
-            ? "#0b0b0b" : "#ffffff";
-        } else {
-          td.className = "cell na";
-        }
-        td.textContent = Math.round(share * 100) + "%";
-        td.title = fmt(v) + " of " + fmt(row.size) + " users";
-        tr.appendChild(td);
-      }
-      tb.appendChild(tr);
-    });
-    t.appendChild(tb);
-
-    var wrap = el("div", "table-wrap");
-    wrap.appendChild(t);
-    c.appendChild(wrap);
-
-    var scale = el("div", "legend");
-    scale.style.marginTop = "12px";
-    [["--seq-100", "<15%"], ["--seq-250", "15–30%"], ["--seq-400", "30–50%"],
-     ["--seq-550", "50–75%"], ["--seq-700", "75%+"]].forEach(function (pair) {
-      var i = el("span", "item");
-      var sw = el("span", "swatch");
-      sw.style.background = cssVar(pair[0]);
-      i.appendChild(sw);
-      i.appendChild(document.createTextNode(pair[1]));
-      scale.appendChild(i);
-    });
-    c.appendChild(scale);
+    paint();
     return c;
   }
 
@@ -1215,7 +1618,6 @@ export const dashboardHtml = String.raw`<!doctype html>
     // a single bar carries no comparison the table doesn't already show.
     var plotMax = rows.reduce(function (mx, r) { return Math.max(mx, r.value || 0); }, 0);
     if (plotMax > 0 && rows.length > 1) {
-      c.appendChild(el("p", "note", "Sessions opened per mode."));
       var host = el("div", "chart");
       c.appendChild(host);
       var draw = function () {
@@ -1227,66 +1629,77 @@ export const dashboardHtml = String.raw`<!doctype html>
       redraws.push(draw);
     }
 
-    var tbl = table([
-      { key: "mode", label: "Mode" },
-      { key: "users", label: "Players", num: true, render: function (x) { return fmt(x.users); } },
-      { key: "usersAuthed", label: "Signed in", num: true, render: function (x) { return fmt(x.usersAuthed); } },
-      { key: "usersAnon", label: "Logged out", num: true, render: function (x) { return fmt(x.usersAnon); } },
-      { key: "sessions", label: "Sessions", num: true, render: function (x) { return fmt(x.sessions); } },
-      { key: "answers", label: "Answers", num: true, render: function (x) { return fmt(x.answers); } },
-      { key: "answersPerSession", label: "Per session", num: true },
-      { key: "accuracy", label: "Accuracy", num: true, render: function (x) { return pctStr(x.accuracy); } },
-      { key: "avgSessionSec", label: "Avg session", num: true, render: function (x) { return dur(x.avgSessionSec); } },
-      { key: "avgAnswerSec", label: "Sec / card", num: true, render: function (x) { return x.avgAnswerSec ? x.avgAnswerSec + "s" : "—"; } },
-      { key: "completions", label: "Finished", num: true, render: function (x) { return fmt(x.completions); } }
-    ], m.modes);
-    tbl.style.marginTop = "16px";
+    var tbl = dataTable("modes", [
+      { key: "mode", label: "Mode", sortable: true },
+      { key: "users", label: "Players", num: true, sortable: true, render: function (x) { return fmt(x.users); } },
+      { key: "usersAuthed", label: "Signed in", num: true, sortable: true, render: function (x) { return fmt(x.usersAuthed); } },
+      { key: "usersAnon", label: "Logged out", num: true, sortable: true, render: function (x) { return fmt(x.usersAnon); } },
+      { key: "sessions", label: "Sessions", num: true, sortable: true, render: function (x) { return fmt(x.sessions); } },
+      { key: "answers", label: "Answers", num: true, sortable: true, render: function (x) { return fmt(x.answers); } },
+      { key: "answersPerSession", label: "Per session", num: true, sortable: true },
+      { key: "accuracy", label: "Accuracy", num: true, sortable: true, render: function (x) { return pctStr(x.accuracy); } },
+      { key: "avgSessionSec", label: "Avg session", num: true, sortable: true, render: function (x) { return dur(x.avgSessionSec); } },
+      { key: "avgAnswerSec", label: "Sec / card", num: true, sortable: true, render: function (x) { return x.avgAnswerSec ? x.avgAnswerSec + "s" : "—"; } },
+      { key: "completions", label: "Finished", num: true, sortable: true, render: function (x) { return fmt(x.completions); } }
+    ], m.modes, { pageSize: 10, sortKey: "sessions", sortDesc: true, unit: "modes" });
+    tbl.style.marginTop = "20px";
     c.appendChild(tbl);
 
+    var out = el("div", "stack");
+    out.appendChild(c);
+
     if (m.variants.length) {
-      var v = el("div");
-      v.style.marginTop = "18px";
-      v.appendChild(el("h3", null, "Focus categories"));
-      v.appendChild(table([
-        { key: "variant", label: "Category" },
-        { key: "mode", label: "Mode" },
-        { key: "users", label: "Players", num: true, render: function (x) { return fmt(x.users); } },
-        { key: "answers", label: "Answers", num: true, render: function (x) { return fmt(x.answers); } },
-        { key: "accuracy", label: "Accuracy", num: true, render: function (x) { return pctStr(x.accuracy); } }
-      ], m.variants));
-      c.appendChild(v);
+      var vc = card("Focus categories", "Play inside a single category.",
+        "Variants are the /focus routes — a mode scoped to one card category.");
+      vc.appendChild(dataTable("variants", [
+        { key: "variant", label: "Category", sortable: true },
+        { key: "mode", label: "Mode", sortable: true },
+        { key: "users", label: "Players", num: true, sortable: true, render: function (x) { return fmt(x.users); } },
+        { key: "answers", label: "Answers", num: true, sortable: true, render: function (x) { return fmt(x.answers); } },
+        { key: "accuracy", label: "Accuracy", num: true, sortable: true, render: function (x) { return pctStr(x.accuracy); } }
+      ], m.variants, {
+        pageSize: 10, sortKey: "answers", sortDesc: true, unit: "categories",
+        search: true, searchPlaceholder: "Search categories", searchKeys: ["variant", "mode"]
+      }));
+      out.appendChild(vc);
     }
-    return c;
+    return out;
   }
 
   function sectionContent(d) {
     var ct = d.content;
+    var out = el("div", "stack");
+
+    var cardCols = [
+      { key: "answer", label: "Answer", sortable: true },
+      { key: "category", label: "Category", sortable: true, render: function (r) {
+          return el("span", "pill", r.category); } },
+      { key: "attempts", label: "Tries", num: true, sortable: true, render: function (r) { return fmt(r.attempts); } },
+      { key: "accuracy", label: "Correct", num: true, sortable: true, render: function (r) { return pctStr(r.accuracy); } }
+    ];
+    var cardOpts = {
+      pageSize: 10, search: true, searchPlaceholder: "Search cards",
+      searchKeys: ["answer", "category"], unit: "cards", truncatedAt: FETCH.cards
+    };
+
     var grid = el("div", "cols");
 
     var hard = card("Hardest cards", "Lowest first-try accuracy.",
       "A card sitting far below the rest is usually ambiguous wording rather than genuine difficulty.");
-    hard.appendChild(table([
-      { key: "answer", label: "Answer" },
-      { key: "category", label: "Category", render: function (r) {
-          var p = el("span", "pill", r.category); return p; } },
-      { key: "attempts", label: "Tries", num: true, render: function (r) { return fmt(r.attempts); } },
-      { key: "accuracy", label: "Correct", num: true, render: function (r) { return pctStr(r.accuracy); } }
-    ], ct.hardest, { emptyText: "No card has been missed enough times to rank yet." }));
+    hard.appendChild(dataTable("hardest", cardCols, ct.hardest, Object.assign({}, cardOpts, {
+      sortKey: "accuracy", sortDesc: false,
+      emptyText: "No card has been missed enough times to rank yet."
+    })));
     grid.appendChild(hard);
 
     var easy = card("Easiest cards", "Highest first-try accuracy.",
       "Candidates for retiring or re-weighting — they are no longer teaching anyone anything.");
-    easy.appendChild(table([
-      { key: "answer", label: "Answer" },
-      { key: "category", label: "Category", render: function (r) {
-          var p = el("span", "pill", r.category); return p; } },
-      { key: "attempts", label: "Tries", num: true, render: function (r) { return fmt(r.attempts); } },
-      { key: "accuracy", label: "Correct", num: true, render: function (r) { return pctStr(r.accuracy); } }
-    ], ct.easiest, { emptyText: "Not enough answers per card yet." }));
+    easy.appendChild(dataTable("easiest", cardCols, ct.easiest, Object.assign({}, cardOpts, {
+      sortKey: "accuracy", sortDesc: true,
+      emptyText: "Not enough answers per card yet."
+    })));
     grid.appendChild(easy);
-
-    var wrapper = el("div");
-    wrapper.appendChild(grid);
+    out.appendChild(grid);
 
     var bycat = card("Reach by category",
       fmt(ct.unseen) + " cards have never been answered by anyone.",
@@ -1309,46 +1722,29 @@ export const dashboardHtml = String.raw`<!doctype html>
     drawCat();
     redraws.push(drawCat);
 
-    var diffTbl = table([
-      { key: "label", label: "Difficulty" },
-      { key: "users", label: "People", num: true, render: function (r) { return fmt(r.users); } },
-      { key: "attempts", label: "Answers", num: true, render: function (r) { return fmt(r.attempts); } },
-      { key: "accuracy", label: "Accuracy", num: true, render: function (r) { return pctStr(r.accuracy); } }
-    ], ct.byDifficulty);
-    diffTbl.style.marginTop = "16px";
+    var diffTbl = dataTable("difficulty", [
+      { key: "label", label: "Difficulty", sortable: true },
+      { key: "users", label: "People", num: true, sortable: true, render: function (r) { return fmt(r.users); } },
+      { key: "attempts", label: "Answers", num: true, sortable: true, render: function (r) { return fmt(r.attempts); } },
+      { key: "accuracy", label: "Accuracy", num: true, sortable: true, render: function (r) { return pctStr(r.accuracy); } }
+    ], ct.byDifficulty, { pageSize: 10, sortKey: "attempts", sortDesc: true, unit: "tiers" });
+    diffTbl.style.marginTop = "20px";
     bycat.appendChild(diffTbl);
-    wrapper.appendChild(bycat);
-    return wrapper;
+    out.appendChild(bycat);
+    return out;
   }
 
-  var userSort = { key: "lastSeen", desc: true };
-
   function sectionUsers(d) {
-    var c = card("People", "Anonymous and signed-in, most recent first.",
-      "Answers and accuracy come from first-try history; sessions and top mode need event data, so they are blank for anyone last seen before the instrumented app shipped.");
+    var c = card("People", "Anonymous and signed-in together.",
+      "Answers and accuracy come from first-try history; sessions and top mode need event data, so they are blank for anyone last seen before the instrumented app shipped. The CSV export carries every column, including the two omitted here.");
 
-    var rows = d.users.slice();
-    var k = userSort.key;
-    rows.sort(function (a, b) {
-      var av = a[k], bv = b[k];
-      if (av === null || av === undefined) av = -Infinity;
-      if (bv === null || bv === undefined) bv = -Infinity;
-      if (typeof av === "string" || typeof bv === "string") {
-        av = String(av); bv = String(bv);
-        return userSort.desc ? (av < bv ? 1 : av > bv ? -1 : 0) : (av > bv ? 1 : av < bv ? -1 : 0);
-      }
-      return userSort.desc ? bv - av : av - bv;
-    });
+    var csvBtn = el("button", "btn", "Export CSV");
+    csvBtn.type = "button";
+    csvBtn.addEventListener("click", downloadCsv);
 
-    function onSort(key) {
-      if (userSort.key === key) userSort.desc = !userSort.desc;
-      else { userSort.key = key; userSort.desc = true; }
-      render();
-    }
-
-    c.appendChild(table([
+    c.appendChild(dataTable("people", [
       {
-        key: "userId", label: "User", render: function (r) {
+        key: "userId", label: "User", sortable: true, render: function (r) {
           var box = el("span");
           var who = el("span", null, r.name || r.email || shortId(r.userId));
           if (!r.name && !r.email) who.className = "mono dim";
@@ -1363,30 +1759,24 @@ export const dashboardHtml = String.raw`<!doctype html>
         }
       },
       { key: "firstSeen", label: "First seen", sortable: true, render: function (r) { return shortDay(r.firstSeen); } },
+      // "Days ago" and "Span" are both derivable from these two dates and
+      // both are in the CSV — dropping them is what lets the table fit its
+      // card without a clipped column at the right edge.
       { key: "lastSeen", label: "Last seen", sortable: true, render: function (r) { return shortDay(r.lastSeen); } },
-      { key: "daysSinceSeen", label: "Days ago", num: true, sortable: true },
-      { key: "activeDays", label: "Active days", num: true, sortable: true, title: "Distinct days with any activity" },
-      { key: "lifespanDays", label: "Span", num: true, sortable: true, title: "Days from first to last visit" },
+      { key: "activeDays", label: "Active", num: true, sortable: true, title: "Distinct days with any activity" },
       { key: "answers", label: "Answers", num: true, sortable: true, render: function (r) { return fmt(r.answers); } },
       { key: "accuracy", label: "Accuracy", num: true, sortable: true, render: function (r) { return pctStr(r.accuracy); } },
       { key: "dailies", label: "Daily", num: true, sortable: true },
       { key: "sessions", label: "Sessions", num: true, sortable: true },
-      { key: "totalMinutes", label: "Minutes", num: true, sortable: true },
-      { key: "topMode", label: "Top mode", render: function (r) { return r.topMode ? el("span", "pill", r.topMode) : "—"; } }
-    ], rows, { sortKey: userSort.key, sortDesc: userSort.desc, onSort: onSort }));
-
-    var actions = el("p", "subtle");
-    actions.style.marginTop = "12px";
-    var link = el("a", null, "Download CSV");
-    link.href = "#";
-    link.style.color = "inherit";
-    link.addEventListener("click", function (ev) {
-      ev.preventDefault();
-      downloadCsv();
-    });
-    actions.appendChild(link);
-    actions.appendChild(document.createTextNode(" · showing " + rows.length + " rows"));
-    c.appendChild(actions);
+      { key: "totalMinutes", label: "Mins", num: true, sortable: true, title: "Total session minutes" },
+      { key: "topMode", label: "Top mode", sortable: true, render: function (r) { return r.topMode ? el("span", "pill", r.topMode) : "—"; } }
+    ], d.users, {
+      pageSize: 25, sortKey: "lastSeen", sortDesc: true, unit: "people",
+      search: true, searchPlaceholder: "Search name, email, id",
+      searchKeys: ["userId", "name", "email", "topMode"],
+      actions: [csvBtn], truncatedAt: FETCH.users,
+      emptyText: "Nobody has been seen in this window."
+    }));
     return c;
   }
 
@@ -1397,25 +1787,30 @@ export const dashboardHtml = String.raw`<!doctype html>
       c.appendChild(el("div", "empty", "Nothing yet."));
       return c;
     }
-    c.appendChild(table([
-      { key: "at", label: "When", render: function (r) {
+    c.appendChild(dataTable("events", [
+      { key: "at", label: "When", sortable: true, render: function (r) {
           var dt = new Date(r.at);
           return isNaN(dt.getTime()) ? r.at : dt.toLocaleString();
         } },
-      { key: "event", label: "Event" },
-      { key: "mode", label: "Mode", render: function (r) { return r.mode ? el("span", "pill", r.mode) : "—"; } },
-      { key: "variant", label: "Detail" },
-      { key: "userId", label: "User", render: function (r) {
+      { key: "event", label: "Event", sortable: true },
+      { key: "mode", label: "Mode", sortable: true, render: function (r) { return r.mode ? el("span", "pill", r.mode) : "—"; } },
+      { key: "variant", label: "Detail", sortable: true },
+      { key: "userId", label: "User", sortable: true, render: function (r) {
           var s = el("span", "mono dim", shortId(r.userId));
           s.title = r.userId;
           return s;
         } },
-      { key: "authed", label: "Type", render: function (r) { return r.authed ? "signed in" : "logged out"; } },
-      { key: "correct", label: "Correct", render: function (r) { return r.correct === null ? "—" : (r.correct ? "yes" : "no"); } },
-      { key: "durationMs", label: "Duration", num: true, render: function (r) {
+      { key: "authed", label: "Type", sortable: true, render: function (r) { return r.authed ? "signed in" : "logged out"; } },
+      { key: "correct", label: "Correct", sortable: true, render: function (r) { return r.correct === null ? "—" : (r.correct ? "yes" : "no"); } },
+      { key: "durationMs", label: "Duration", num: true, sortable: true, render: function (r) {
           return r.durationMs === null ? "—" : (r.durationMs >= 1000 ? dur(Math.round(r.durationMs / 1000)) : r.durationMs + "ms");
         } }
-    ], d.events));
+    ], d.events, {
+      pageSize: 25, sortKey: "at", sortDesc: true, unit: "events",
+      search: true, searchPlaceholder: "Search event, mode, user",
+      searchKeys: ["event", "mode", "variant", "userId"],
+      truncatedAt: FETCH.events
+    }));
     return c;
   }
 
@@ -1423,44 +1818,25 @@ export const dashboardHtml = String.raw`<!doctype html>
   var app = document.getElementById("app");
 
   /**
-   * One tab per question. The KPI strip is pinned above every tab, because
-   * "how many people are here" is context for all of them.
-   *
-   * Only the active tab is built. That is not just a rendering economy: the
-   * chart renderers size themselves from 'host.clientWidth', which is 0
-   * inside a 'hidden' container, so a pre-built hidden tab would lay its
-   * charts out at zero width and never recover without a resize.
+   * One tab per question. Only the active tab is built. That is not just
+   * a rendering economy: the chart renderers size themselves from
+   * 'host.clientWidth', which is 0 inside a 'hidden' container, so a
+   * pre-built hidden tab would lay its charts out at zero width and never
+   * recover without a resize.
    */
   var TABS = [
     {
       id: "overview", label: "Overview",
-      build: function (d) { return [sectionActivity(d), sectionVolume(d)]; }
+      build: function (d) { return [sectionActivity(d), sectionVolume(d), sectionTotals(d)]; }
     },
     {
       id: "retention", label: "Retention",
-      build: function (d) {
-        var rg = el("div", "cols");
-        rg.appendChild(sectionRetention(d));
-        rg.appendChild(sectionCohorts(d));
-        return [rg];
-      }
+      build: function (d) { return [sectionRetention(d), sectionCohorts(d)]; }
     },
-    {
-      id: "modes", label: "Modes",
-      build: function (d) { return [sectionModes(d)]; }
-    },
-    {
-      id: "content", label: "Content",
-      build: function (d) { return [sectionContent(d)]; }
-    },
-    {
-      id: "people", label: "People",
-      build: function (d) { return [sectionUsers(d)]; }
-    },
-    {
-      id: "events", label: "Events",
-      build: function (d) { return [sectionEvents(d)]; }
-    }
+    { id: "modes", label: "Modes", build: function (d) { return [sectionModes(d)]; } },
+    { id: "content", label: "Content", build: function (d) { return [sectionContent(d)]; } },
+    { id: "people", label: "People", build: function (d) { return [sectionUsers(d)]; } },
+    { id: "events", label: "Events", build: function (d) { return [sectionEvents(d)]; } }
   ];
 
   function activeTab() {
@@ -1509,8 +1885,10 @@ export const dashboardHtml = String.raw`<!doctype html>
     redraws = [];
     var d = state.data;
     clear(app);
-    app.appendChild(sectionHeadline(d));
-    activeTab().build(d).forEach(function (node) { app.appendChild(node); });
+    app.appendChild(sectionKpis(d));
+    var stack = el("div", "stack");
+    activeTab().build(d).forEach(function (node) { stack.appendChild(node); });
+    app.appendChild(stack);
 
     // Every chart sizes itself from host.clientWidth, but the sections are
     // built detached — so the first pass measures 0 and falls back to 640px,
@@ -1535,7 +1913,8 @@ export const dashboardHtml = String.raw`<!doctype html>
   // ── data ──────────────────────────────────────────────────
   function apiUrl(path) {
     var qs = "days=" + state.days + "&weeks=" + state.weeks +
-      "&users=500" + (state.onlyAuthed ? "&onlyAuthed=1" : "");
+      "&users=" + FETCH.users + "&events=" + FETCH.events + "&cards=" + FETCH.cards +
+      (state.onlyAuthed ? "&onlyAuthed=1" : "");
     return API_BASE + path + "?" + qs;
   }
 
