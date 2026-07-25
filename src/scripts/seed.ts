@@ -6,6 +6,7 @@ import { sql } from 'drizzle-orm';
 import { env } from '../config/env';
 import { cards, userProgress } from '../db/schema';
 import type { NewCard } from '../db/schema';
+import { CardService } from '../services/cardService';
 
 interface CardData {
   id: string;
@@ -94,6 +95,12 @@ async function run(): Promise<void> {
     });
 
     console.log(`[seed] upserted ${newCards.length} cards (user_progress preserved)`);
+
+    // Bust the shared catalog metadata cache so the new/updated cards are
+    // served immediately instead of waiting out the 1h Redis TTL. Without
+    // this, `getCardMetadata()` keeps returning the pre-seed card list.
+    await new CardService().invalidateCatalog();
+    console.log('[seed] catalog metadata cache invalidated');
   } finally {
     await pool.end();
   }

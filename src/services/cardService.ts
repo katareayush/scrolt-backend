@@ -206,14 +206,14 @@ export class CardService {
 
     // Use the pure ranker so behavior is identical to what unit tests
     // verify. Review-due cards (wrong > 24h ago) get a 3× scoring boost.
+    // rankCards returns the unseen card ids already sorted by score.
     const ranked = rankCards(allMeta, seenSet, {
       seedPrefix,
       weights,
       reviewDueIds: reviewDue,
     });
-    const scored = ranked.map((id) => ({ id, score: 0 })); // alias for the legacy var name below
 
-    if (offset >= scored.length) {
+    if (offset >= ranked.length) {
       const empty = { cards: [] as Card[], nextCursor: undefined, hasMore: false };
       try {
         await redis.set(batchKey, JSON.stringify(empty), { ex: CardService.BATCH_TTL });
@@ -224,19 +224,19 @@ export class CardService {
       return empty;
     }
 
-    const slice = scored.slice(offset, offset + count);
+    const pageIds = ranked.slice(offset, offset + count);
 
     // Single indexed DB hit for the slice's full card data.
     const cardRows =
-      slice.length > 0
-        ? await db.select().from(cards).where(inArray(cards.id, slice.map((s) => s.id)))
+      pageIds.length > 0
+        ? await db.select().from(cards).where(inArray(cards.id, pageIds))
         : [];
     const lookup = new Map(cardRows.map((c) => [c.id, c] as const));
-    const orderedCards = slice
-      .map((s) => lookup.get(s.id))
+    const orderedCards = pageIds
+      .map((id) => lookup.get(id))
       .filter((c): c is Card => Boolean(c));
 
-    const hasMore = offset + count < scored.length;
+    const hasMore = offset + count < ranked.length;
     const nextCursor = hasMore ? String(offset + count) : undefined;
 
     const result = { cards: orderedCards, nextCursor, hasMore };
@@ -564,7 +564,7 @@ export class CardService {
     // One round trip: distinct active days (for the streak walk) and the
     // lifetime aggregates come back in a single row. `string_agg` keeps
     // the day list as plain text so no array-type parsing is involved.
-    const todayUtcStr = new Date().toISOString().slice(0, 10);
+    const today = CardService.todayUtc();
     const combinedRows = await db.execute(sql`
       WITH days AS (
         SELECT DISTINCT DATE(answered_at AT TIME ZONE 'UTC') AS day
@@ -576,7 +576,7 @@ export class CardService {
       SELECT
         (SELECT string_agg(day::text, ',' ORDER BY day DESC) FROM days) AS days,
         COUNT(*)::text AS total,
-        COUNT(*) FILTER (WHERE DATE(answered_at AT TIME ZONE 'UTC') = ${todayUtcStr})::text AS today_count,
+        COUNT(*) FILTER (WHERE DATE(answered_at AT TIME ZONE 'UTC') = ${today})::text AS today_count,
         MAX(answered_at)::text AS last_at
       FROM user_progress
       WHERE user_id = ${userId}
@@ -589,8 +589,7 @@ export class CardService {
 
     let streak = 0;
     if (days.length > 0) {
-      const todayStr = new Date().toISOString().slice(0, 10);
-      const cursor = new Date(`${todayStr}T00:00:00.000Z`);
+      const cursor = new Date(`${today}T00:00:00.000Z`);
       const mostRecent = new Date(`${days[0]}T00:00:00.000Z`);
       const diffDays = Math.round(
         (cursor.getTime() - mostRecent.getTime()) / 86_400_000,
@@ -628,7 +627,7 @@ export class CardService {
   }
 
   private dailySeedPrefix(userId: string): string {
-    return `${userId}:${new Date().toISOString().slice(0, 10)}`;
+    return `${userId}:${CardService.todayUtc()}`;
   }
 
   private calculateWeights(

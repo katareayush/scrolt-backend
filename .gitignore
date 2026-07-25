@@ -12,6 +12,8 @@ build/
 
 *.tsbuildinfo
 
+*.pem
+
 .vscode/
 .idea/
 *.swp
