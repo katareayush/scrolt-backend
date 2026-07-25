@@ -7,12 +7,14 @@ import {
   rankCards,
   pickDailyIds,
   fnv1aNormalized,
+  shuffleOptions,
+  withShuffledOptions,
   type CardMeta,
   type Weights,
 } from './cardAlgorithm';
 import { LocalCache } from '../utils/localCache';
 
-export { rankCards, pickDailyIds, fnv1aNormalized };
+export { rankCards, pickDailyIds, fnv1aNormalized, shuffleOptions, withShuffledOptions };
 export type { CardMeta, Weights };
 
 /**
@@ -75,6 +77,16 @@ export class CardService {
 
   private getCacheKey(prefix: string, ...keys: string[]): string {
     return `${prefix}:${keys.join(':')}`;
+  }
+
+  /**
+   * Normalize option order on the way out. Applied at every return
+   * boundary — including cache hits, since payloads written by an older
+   * build still carry the answer-first order from the catalog. Safe to
+   * apply repeatedly: `shuffleOptions` is idempotent.
+   */
+  private shuffled<T extends { id: string; options: string[] }>(rows: T[]): T[] {
+    return rows.map(withShuffledOptions);
   }
 
   private fromRedisJson<T>(value: unknown): T | null {
@@ -186,8 +198,9 @@ export class CardService {
         if (!parsed) {
           return { cards: [], nextCursor: undefined, hasMore: false };
         }
-        CardService.localBatchCache.set(batchKey, parsed);
-        return parsed;
+        const normalized = { ...parsed, cards: this.shuffled(parsed.cards) };
+        CardService.localBatchCache.set(batchKey, normalized);
+        return normalized;
       }
     } catch (err) {
       console.warn('Batch cache read error:', err);
@@ -232,9 +245,9 @@ export class CardService {
         ? await db.select().from(cards).where(inArray(cards.id, pageIds))
         : [];
     const lookup = new Map(cardRows.map((c) => [c.id, c] as const));
-    const orderedCards = pageIds
-      .map((id) => lookup.get(id))
-      .filter((c): c is Card => Boolean(c));
+    const orderedCards = this.shuffled(
+      pageIds.map((id) => lookup.get(id)).filter((c): c is Card => Boolean(c)),
+    );
 
     const hasMore = offset + count < ranked.length;
     const nextCursor = hasMore ? String(offset + count) : undefined;
@@ -270,7 +283,7 @@ export class CardService {
     const cacheKey = `daily:cards:${dateStr}:${count}`;
     try {
       const cached = await redis.get(cacheKey);
-      if (cached) return this.fromRedisJson<Card[]>(cached) ?? [];
+      if (cached) return this.shuffled(this.fromRedisJson<Card[]>(cached) ?? []);
     } catch (err) {
       console.warn('Daily cache read error:', err);
     }
@@ -285,9 +298,9 @@ export class CardService {
       .from(cards)
       .where(inArray(cards.id, ids));
     const lookup = new Map(cardRows.map((c) => [c.id, c] as const));
-    const ordered = ids
-      .map((id) => lookup.get(id))
-      .filter((c): c is Card => Boolean(c));
+    const ordered = this.shuffled(
+      ids.map((id) => lookup.get(id)).filter((c): c is Card => Boolean(c)),
+    );
 
     try {
       // 25h TTL: covers any timezone edge near midnight.
@@ -409,7 +422,7 @@ export class CardService {
       ORDER BY p.answered_at DESC
       LIMIT ${cap}
     `);
-    return ((rows as unknown as { rows: Card[] }).rows ?? []);
+    return this.shuffled((rows as unknown as { rows: Card[] }).rows ?? []);
   }
 
   /**
@@ -429,7 +442,7 @@ export class CardService {
       ORDER BY p.answered_at DESC
       LIMIT ${cap}
     `);
-    return ((rows as unknown as { rows: Card[] }).rows ?? []);
+    return this.shuffled((rows as unknown as { rows: Card[] }).rows ?? []);
   }
 
   /**

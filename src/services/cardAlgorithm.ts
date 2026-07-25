@@ -54,6 +54,43 @@ export function fnv1aNormalized(s: string): number {
 }
 
 /**
+ * Deterministic option order for a card.
+ *
+ * The generated catalog was written answer-first (1085 of 1086 cards had
+ * the correct option at index 0), which made "always tap the first one"
+ * a winning strategy. Rather than trusting stored order, every read path
+ * runs options through this.
+ *
+ * The sort key hashes the option TEXT (not its index), which makes the
+ * function:
+ * - idempotent — re-shuffling an already-shuffled array is a no-op, so
+ *   it can be applied to freshly-fetched rows and to cached payloads
+ *   written by an older build without flip-flopping;
+ * - stable — the same card shows the same order on every render, reload
+ *   and device, so a re-read of a card the user already saw doesn't move
+ *   the buttons under them;
+ * - per-card — `cardId` is in the key, so the correct answer doesn't
+ *   cluster at one position across the catalog.
+ *
+ * Ties (identical hashes) fall back to lexical order so the result never
+ * depends on input order.
+ */
+export function shuffleOptions(cardId: string, options: string[]): string[] {
+  return options
+    .map((option) => ({ option, score: fnv1aNormalized(`${cardId}:${option}`) }))
+    .sort((a, b) => a.score - b.score || (a.option < b.option ? -1 : 1))
+    .map((s) => s.option);
+}
+
+/** {@link shuffleOptions} applied to a whole card row. */
+export function withShuffledOptions<T extends { id: string; options: string[] }>(
+  card: T,
+): T {
+  if (!Array.isArray(card.options)) return card;
+  return { ...card, options: shuffleOptions(card.id, card.options) };
+}
+
+/**
  * Rank a catalog by per-user/per-day deterministic score. Lower score =
  * earlier in the feed. Cards already in `seenIds` are filtered out.
  *

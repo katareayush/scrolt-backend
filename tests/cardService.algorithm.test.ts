@@ -3,6 +3,8 @@ import {
   rankCards,
   pickDailyIds,
   fnv1aNormalized,
+  shuffleOptions,
+  withShuffledOptions,
   type CardMeta,
   type Weights,
 } from '../src/services/cardAlgorithm';
@@ -228,5 +230,68 @@ describe('pickDailyIds — daily challenge', () => {
     const ids = pickDailyIds(meta, '2026-05-14', 10);
     expect(ids).toHaveLength(5);
     expect(new Set(ids).size).toBe(5);
+  });
+});
+
+/* ─── shuffleOptions ───────────────────────────────────────────── */
+
+describe('shuffleOptions', () => {
+  const options = ['alpha', 'bravo', 'charlie'];
+
+  it('is stable for the same card', () => {
+    expect(shuffleOptions('scrolt_001', options)).toEqual(
+      shuffleOptions('scrolt_001', options),
+    );
+  });
+
+  it('is idempotent, so re-shuffling a shuffled array is a no-op', () => {
+    const once = shuffleOptions('scrolt_001', options);
+    expect(shuffleOptions('scrolt_001', once)).toEqual(once);
+  });
+
+  it('ignores input order — same card, same result', () => {
+    const reversed = [...options].reverse();
+    expect(shuffleOptions('scrolt_001', reversed)).toEqual(
+      shuffleOptions('scrolt_001', options),
+    );
+  });
+
+  it('preserves the option set', () => {
+    const out = shuffleOptions('scrolt_042', options);
+    expect([...out].sort()).toEqual([...options].sort());
+  });
+
+  it('spreads the answer across positions instead of pinning it to index 0', () => {
+    // The seeded catalog stored every answer first. Feed that shape in
+    // and assert no position holds more than half the answers.
+    const counts = [0, 0, 0];
+    const total = 600;
+    for (let i = 0; i < total; i++) {
+      const id = `scrolt_${String(i).padStart(4, '0')}`;
+      const answer = `answer_${i}`;
+      const shuffled = shuffleOptions(id, [answer, `wrong_a_${i}`, `wrong_b_${i}`]);
+      counts[shuffled.indexOf(answer)]!++;
+    }
+    for (const c of counts) {
+      expect(c).toBeGreaterThan(total * 0.25);
+      expect(c).toBeLessThan(total * 0.42);
+    }
+  });
+});
+
+describe('withShuffledOptions', () => {
+  it('rewrites options without touching the rest of the card', () => {
+    const card = {
+      id: 'scrolt_007',
+      sentence: 'a ___ b',
+      options: ['x', 'y', 'z'],
+      answer: 'x',
+      explanation: 'because',
+    };
+    const out = withShuffledOptions(card);
+    expect(out.options).toEqual(shuffleOptions('scrolt_007', card.options));
+    expect(out.options).toContain(out.answer);
+    expect({ ...out, options: null }).toEqual({ ...card, options: null });
+    expect(card.options).toEqual(['x', 'y', 'z']); // input untouched
   });
 });
