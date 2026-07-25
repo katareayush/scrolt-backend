@@ -236,8 +236,6 @@ export async function getOverview(days: number): Promise<{
       answersAllTime: num(t.answers_all_time),
       accuracyAllTime: pct(num(t.correct_all_time), graded),
       totalCards: num(t.total_cards),
-      // Share of the catalogue the average active user has touched.
-      catalogueCoverage: pct(num(t.answers_all_time), num(t.ever_active) * num(t.total_cards)),
       totalEvents: num(t.total_events),
       dailyCompletions: num(t.daily_completions),
       friendships: num(t.friendships),
@@ -375,14 +373,24 @@ export async function getRetention(weeks: number): Promise<{
   }
 
   const today = new Date();
+  const elapsedFor = (cohort: string): number =>
+    Math.floor(
+      (today.getTime() - new Date(`${cohort}T00:00:00Z`).getTime()) / (7 * 24 * 60 * 60 * 1000),
+    );
+
+  // Widen the grid to every week that is *measurable*, not just weeks
+  // where somebody happened to return. Otherwise a cohort with zero
+  // retention silently loses its columns and the grid understates how
+  // much history we actually have — "no W2 column" reads as "no data"
+  // when the truth is "nobody came back in week 2".
+  const widest = [...byCohort.keys()].reduce((m, c) => Math.max(m, elapsedFor(c)), 0);
+  maxWeekOffset = Math.min(Math.max(maxWeekOffset, widest), weeks);
+
   const cohorts: CohortRow[] = [...byCohort.entries()]
     .sort((a, b) => (a[0] < b[0] ? 1 : -1))
     .map(([cohort, inner]) => {
       const size = inner.get(0) ?? 0;
-      const cohortStart = new Date(`${cohort}T00:00:00Z`);
-      const weeksElapsed = Math.floor(
-        (today.getTime() - cohortStart.getTime()) / (7 * 24 * 60 * 60 * 1000),
-      );
+      const weeksElapsed = elapsedFor(cohort);
       const cells: (number | null)[] = [];
       for (let i = 0; i <= maxWeekOffset; i++) {
         cells.push(i <= weeksElapsed ? inner.get(i) ?? 0 : null);
@@ -424,7 +432,10 @@ export async function getModes(days: number): Promise<{
       FROM analytics_events
       WHERE at >= NOW() - ${sql.raw(`INTERVAL '${days} days'`)}
       GROUP BY 1
-      ORDER BY answers DESC, sessions DESC
+      -- Sessions first: it's what the dashboard plots, and a mode can
+      -- legitimately have sessions but no answers yet (someone opened it
+      -- and left), which ordering by answers would bury.
+      ORDER BY sessions DESC, answers DESC
     `),
     query(sql`
       SELECT mode, variant,
@@ -496,6 +507,9 @@ export async function getContent(minAnswers: number, limit: number): Promise<{
     query(sql`
       SELECT *, ROUND(100.0 * correct / graded, 1) AS accuracy
       FROM (${cardStats}) s
+      -- Exclude perfect cards: padding "hardest" with 100%-accuracy rows
+      -- when few cards have ever been missed makes the list meaningless.
+      WHERE correct < graded
       ORDER BY (1.0 * correct / graded) ASC, graded DESC
       LIMIT ${limit}
     `),

@@ -28,6 +28,9 @@ export const dashboardHtml = String.raw`<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Scrolt · Analytics</title>
+<!-- Inline SVG favicon: stops the browser requesting /favicon.ico (which
+     the API has no route for) without adding an external fetch. -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='4' fill='%232a78d6'/><rect x='4' y='8' width='2' height='5' fill='white'/><rect x='7' y='5' width='2' height='8' fill='white'/><rect x='10' y='3' width='2' height='10' fill='white'/></svg>">
 <style>
   :root {
     color-scheme: light;
@@ -308,6 +311,13 @@ export const dashboardHtml = String.raw`<!doctype html>
 
   var TOKEN_KEY = "scrolt_admin_token";
   var THEME_KEY = "scrolt_admin_theme";
+
+  // Base for every API call. Derived from the current path rather than
+  // hardcoded so the page works whether it was served at /admin or
+  // /admin/, and keeps working behind a proxy that adds a prefix.
+  // A bare relative "api/x" would NOT work: from /admin it resolves to
+  // /api/x, silently dropping the mount point.
+  var API_BASE = window.location.pathname.replace(/\/+$/, "") + "/api/";
 
   var state = {
     token: null,
@@ -595,7 +605,9 @@ export const dashboardHtml = String.raw`<!doctype html>
   function renderGroupedColumns(host, groups, series, opts) {
     opts = opts || {};
     var W = Math.max(320, host.clientWidth || 640);
-    var padL = 40, padR = 14, padT = 20, padB = 34;
+    // Percent ticks ("100%") need more gutter than bare counts.
+    var padL = opts.suffix ? 48 : 40;
+    var padR = 14, padT = 20, padB = 34;
     var H = opts.height || 210;
     var plotW = W - padL - padR;
     var plotH = H - padT - padB;
@@ -604,7 +616,15 @@ export const dashboardHtml = String.raw`<!doctype html>
     groups.forEach(function (g) {
       series.forEach(function (s) { if (g[s.key] !== null && g[s.key] !== undefined) vals.push(g[s.key]); });
     });
-    var max = opts.max || niceMax(Math.max.apply(null, vals.concat([1])));
+    // Scale to the data rather than pinning percentages to 100: at low
+    // volume a 3% bar against a 0–100 axis is invisible and the card
+    // reads as broken. opts.minMax keeps a small value from being inflated
+    // to look like a full bar, and the axis ticks always state the real
+    // numbers, so nothing is overstated.
+    var max = opts.max || Math.max(
+      niceMax(Math.max.apply(null, vals.concat([0]))),
+      opts.minMax || 1
+    );
     var band = plotW / Math.max(1, groups.length);
     var inner = Math.min(MAX_BAR, Math.max(4, (band * 0.62) / series.length - GAP));
 
@@ -959,7 +979,7 @@ export const dashboardHtml = String.raw`<!doctype html>
     c.appendChild(host);
     function draw() {
       renderGroupedColumns(host, groups, series, {
-        height: 215, suffix: "%", max: 100, labelLast: true,
+        height: 215, suffix: "%", minMax: 20, labelLast: true,
         ariaLabel: "Return rate by day, signed-in versus logged-out",
         extraRows: function (g) {
           return [{ color: null, value: g.all === null ? "—" : Math.round(g.all) + "%", name: "everyone" }];
@@ -1081,29 +1101,39 @@ export const dashboardHtml = String.raw`<!doctype html>
       return c;
     }
 
-    var host = el("div", "chart");
-    c.appendChild(host);
+    // Plot sessions, not answers: a mode can have sessions and no
+    // answers yet (opened and abandoned), and an all-zero bar chart
+    // renders as a stranded value with no mark.
     var rows = m.modes.map(function (x) {
       return {
         label: x.mode,
-        value: x.answers,
-        display: fmt(x.answers),
+        value: x.sessions,
+        display: fmt(x.sessions),
         tip: [
-          { color: cssVar("--series-1"), value: fmt(x.answers), name: "answers" },
-          { color: null, value: fmt(x.sessions), name: "sessions" },
+          { color: cssVar("--series-1"), value: fmt(x.sessions), name: "sessions" },
+          { color: null, value: fmt(x.answers), name: "answers" },
           { color: null, value: fmt(x.users), name: "players" },
           { color: null, value: pctStr(x.accuracy), name: "accuracy" },
           { color: null, value: dur(x.avgSessionSec), name: "avg session" }
         ]
       };
     });
-    function draw() {
-      renderBars(host, rows, {
-        ariaLabel: "Answers by game mode", unit: "answers", labelW: 76
-      });
+
+    // Needs at least two modes with a non-zero value to be worth a chart:
+    // a single bar carries no comparison the table doesn't already show.
+    var plotMax = rows.reduce(function (mx, r) { return Math.max(mx, r.value || 0); }, 0);
+    if (plotMax > 0 && rows.length > 1) {
+      c.appendChild(el("p", "note", "Sessions opened per mode."));
+      var host = el("div", "chart");
+      c.appendChild(host);
+      var draw = function () {
+        renderBars(host, rows, {
+          ariaLabel: "Sessions by game mode", unit: "sessions", labelW: 76
+        });
+      };
+      draw();
+      redraws.push(draw);
     }
-    draw();
-    redraws.push(draw);
 
     var tbl = table([
       { key: "mode", label: "Mode" },
@@ -1149,7 +1179,7 @@ export const dashboardHtml = String.raw`<!doctype html>
           var p = el("span", "pill", r.category); return p; } },
       { key: "attempts", label: "Tries", num: true, render: function (r) { return fmt(r.attempts); } },
       { key: "accuracy", label: "Correct", num: true, render: function (r) { return pctStr(r.accuracy); } }
-    ], ct.hardest, { emptyText: "Not enough answers per card yet." }));
+    ], ct.hardest, { emptyText: "No card has been missed enough times to rank yet." }));
     grid.appendChild(hard);
 
     var easy = card("Easiest cards",
@@ -1335,7 +1365,7 @@ export const dashboardHtml = String.raw`<!doctype html>
   function apiUrl(path) {
     var qs = "days=" + state.days + "&weeks=" + state.weeks +
       "&users=500" + (state.onlyAuthed ? "&onlyAuthed=1" : "");
-    return "api/" + path + "?" + qs;
+    return API_BASE + path + "?" + qs;
   }
 
   function load() {
@@ -1405,7 +1435,7 @@ export const dashboardHtml = String.raw`<!doctype html>
   }
 
   function tryToken(token, onFail) {
-    fetch("api/verify", { headers: { "X-Admin-Token": token }, cache: "no-store" })
+    fetch(API_BASE + "verify", { headers: { "X-Admin-Token": token }, cache: "no-store" })
       .then(function (res) {
         if (res.ok) unlock(token);
         else onFail(res.status === 429 ? "Too many attempts — wait a minute." : "Invalid token.");
