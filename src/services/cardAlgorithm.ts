@@ -26,6 +26,45 @@ export interface Weights {
   };
 }
 
+/**
+ * Difficulty ladder.
+ *
+ * The feed climbs a rung for every run of consecutive correct answers
+ * (see the client's `difficultyLadder`), and each rung re-weights the
+ * catalog toward harder cards.
+ *
+ * These are *weights*, not filters, and no tier is ever zero. That is
+ * deliberate: `rankCards` ranks the whole unseen catalog, so a heavily
+ * weighted tier surfaces first but the feed can never run dry — a user
+ * at the top rung who has exhausted every hard card still gets a feed,
+ * just a mostly-medium one. Filtering would strand them on an empty
+ * deck, which is the failure mode this design exists to avoid.
+ *
+ * Monotonic by construction: easy falls, hard rises, every step.
+ */
+export const MAX_DIFFICULTY_LEVEL = 4;
+
+const LEVEL_WEIGHTS: ReadonlyArray<{ easy: number; medium: number; hard: number }> = [
+  { easy: 3.0, medium: 2.0, hard: 1.0 }, // 0 — the default mix
+  { easy: 1.6, medium: 3.0, hard: 1.6 }, // 1 — medium-leaning
+  { easy: 0.8, medium: 2.4, hard: 3.0 }, // 2 — hard starts to lead
+  { easy: 0.4, medium: 1.6, hard: 4.0 }, // 3 — hard-dominant
+  { easy: 0.2, medium: 1.0, hard: 5.0 }, // 4 — as hard as the catalog goes
+];
+
+/** Clamp an arbitrary number to a valid rung. */
+export function clampLevel(level: unknown): number {
+  const n = typeof level === 'number' ? level : Number(level);
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(MAX_DIFFICULTY_LEVEL, Math.max(0, Math.floor(n)));
+}
+
+/** Per-difficulty weights for a ladder rung. */
+export function weightsForLevel(level: number): { easy: number; medium: number; hard: number } {
+  // Non-null is safe: clampLevel pins the index into [0, MAX].
+  return { ...LEVEL_WEIGHTS[clampLevel(level)]! };
+}
+
 export interface SelectOptions {
   /** Per-user, per-day seed prefix (e.g. `userId:2026-05-14`). */
   seedPrefix: string;

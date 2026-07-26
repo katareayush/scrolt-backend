@@ -9,12 +9,24 @@ import {
   fnv1aNormalized,
   shuffleOptions,
   withShuffledOptions,
+  weightsForLevel,
+  clampLevel,
+  MAX_DIFFICULTY_LEVEL,
   type CardMeta,
   type Weights,
 } from './cardAlgorithm';
 import { LocalCache } from '../utils/localCache';
 
-export { rankCards, pickDailyIds, fnv1aNormalized, shuffleOptions, withShuffledOptions };
+export {
+  rankCards,
+  pickDailyIds,
+  fnv1aNormalized,
+  shuffleOptions,
+  withShuffledOptions,
+  weightsForLevel,
+  clampLevel,
+  MAX_DIFFICULTY_LEVEL,
+};
 export type { CardMeta, Weights };
 
 /**
@@ -165,9 +177,13 @@ export class CardService {
     cursor?: string,
     preferredDifficulty?: string,
     preferredCategory?: string,
+    level = 0,
   ): Promise<{ cards: Card[]; nextCursor: string | undefined; hasMore: boolean }> {
     const offset = cursor ? Math.max(0, parseInt(cursor, 10) || 0) : 0;
+    const rung = clampLevel(level);
 
+    // The ladder rung belongs in the key: it changes the ranking, so a
+    // level-0 deck must never be handed back to a request at level 2.
     const version = await this.getUserCacheVersion(userId);
     const batchKey = this.getCacheKey(
       'batch',
@@ -177,6 +193,7 @@ export class CardService {
       offset.toString(),
       preferredDifficulty ?? '_',
       preferredCategory ?? '_',
+      `l${rung}`,
     );
 
     const localBatch = CardService.localBatchCache.get(batchKey);
@@ -210,7 +227,7 @@ export class CardService {
 
     const seenSet = new Set(seenIds);
     const seedPrefix = this.dailySeedPrefix(userId);
-    const weights = this.calculateWeights(preferredDifficulty, preferredCategory);
+    const weights = this.calculateWeights(preferredDifficulty, preferredCategory, rung);
 
     // Use the pure ranker so behavior is identical to what unit tests
     // verify. Review-due cards (wrong > 24h ago) get a 3× scoring boost.
@@ -638,14 +655,21 @@ export class CardService {
     return `${userId}:${CardService.todayUtc()}`;
   }
 
+  /**
+   * `level` is the streak ladder (0 = default mix, higher = harder). An
+   * explicit `preferredDifficulty` is a deliberate user choice — the
+   * /focus routes — so it is applied last and overrides the ladder.
+   */
   private calculateWeights(
     preferredDifficulty?: string,
     preferredCategory?: string,
+    level = 0,
   ): Weights {
+    const tiers = weightsForLevel(level);
     const w: Weights = {
-      easy: 3.0,
-      medium: 2.0,
-      hard: 1.0,
+      easy: tiers.easy,
+      medium: tiers.medium,
+      hard: tiers.hard,
       categories: {
         everyday: 2.5,
         emotion: 2.0,
@@ -655,9 +679,12 @@ export class CardService {
         precision: 1.2,
       },
     };
-    if (preferredDifficulty === 'easy') w.easy = 4.0;
-    else if (preferredDifficulty === 'medium') w.medium = 3.5;
-    else if (preferredDifficulty === 'hard') w.hard = 3.0;
+    // A floor, not an assignment: at the top of the ladder `hard` is
+    // already 5.0, and an explicit "hard" preference must never pull it
+    // back down to 3.0.
+    if (preferredDifficulty === 'easy') w.easy = Math.max(w.easy, 4.0);
+    else if (preferredDifficulty === 'medium') w.medium = Math.max(w.medium, 3.5);
+    else if (preferredDifficulty === 'hard') w.hard = Math.max(w.hard, 3.0);
 
     if (
       preferredCategory &&

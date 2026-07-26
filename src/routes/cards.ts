@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { CardService } from '../services/cardService';
+import { CardService, clampLevel } from '../services/cardService';
 import { requireUser } from '../middleware/session';
 import { writeLimiter } from '../middleware/rateLimit';
 import { withDbRetry } from '../db/connection';
@@ -45,6 +45,9 @@ cardsRouter.get('/batch', requireUser, async (req, res) => {
     const difficultyRaw = typeof req.query.difficulty === 'string' ? req.query.difficulty : '';
     const preferredCategory = ALLOWED_CATEGORIES.has(categoryRaw) ? categoryRaw : undefined;
     const preferredDifficulty = ALLOWED_DIFFICULTIES.has(difficultyRaw) ? difficultyRaw : undefined;
+    // Streak ladder rung. Clamped in the service, so a hand-crafted
+    // `?level=999` just pins to the top rung rather than erroring.
+    const level = clampLevel(req.query.level);
 
     // Private cache for 30s so a back-button or quick reload doesn't
     // re-hit the API. `private` keeps shared proxies / CDNs out — the
@@ -58,6 +61,7 @@ cardsRouter.get('/batch', requireUser, async (req, res) => {
         cursor,
         preferredDifficulty,
         preferredCategory,
+        level,
       ),
     );
 
