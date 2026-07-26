@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatDuration } from '../src/routes/health';
+import { formatDuration } from '../src/utils/formatDuration';
 
 describe('formatDuration', () => {
   it('keeps seconds while the total is short', () => {
